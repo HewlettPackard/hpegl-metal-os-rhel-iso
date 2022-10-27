@@ -1,0 +1,211 @@
+#cloud-config
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+merge_how:
+  - name:     list
+    settings: [append]
+  - name:     dict
+    settings: [no_replace, recurse_list]
+
+hostname: {{ .Name}}
+{{- if contains .Name "."}}
+fqdn:     {{ .Name }}
+{{else}}
+fqdn:     {{ .Name }}.localdomain
+{{end}}
+manage_etc_hosts: true
+
+# setup SSH keys
+# ----------------------------------------------------
+users:
+  - name: root
+{{- if .SSHKeys }}
+    ssh_authorized_keys:
+  {{- range $key := .SSHKeys}}
+      - {{$key }}
+  {{- end}}
+{{end}}
+
+# iscsi, proxy and ntp info
+# ----------------------------------------------------
+{{- /* extract proxy and ntp info from HostDef struct */}}
+{{- $proxy := "" }}
+{{- $no_proxy := "" }}
+{{- $ntp := ""}}
+{{- range .Connections }}
+  {{- range .Networks }}
+    {{- range .Ranges }}
+      {{- if  .Proxy }}
+        {{- $proxy = .Proxy }}
+        {{- $no_proxy = .NoProxy }}
+      {{- end}}
+      {{- if .NTP}}
+        {{- $ntp = .NTP}}
+      {{- end}}
+    {{- end}}
+  {{- end}}
+{{- end}}
+
+write_files:
+  - path: /etc/sysconfig/node_exporter
+    owner: node_exporter
+    permissions: '0644'
+    content: |
+        ARGS="--web.listen-address=\":45678\""
+  - path: /etc/systemd/system/node_exporter.service
+    owner: root
+    permissions: '0644'
+    content: |
+        [Unit]
+        Description=Node Exporter
+        [Service]
+        User=node_exporter
+        EnvironmentFile=/etc/sysconfig/node_exporter
+        ExecStart=/usr/bin/node_exporter $ARGS
+        [Install]
+        WantedBy=multi-user.target
+{{- /* verify the rest of write_files: is needed */}}
+  {{- if  .InitiatorName}}
+  - path: /etc/iscsi/initiatorname.iscsi
+    owner: root
+    permissions: '0644'
+    content: |
+      InitiatorName={{.InitiatorName}}
+  {{- end}}
+  {{- if  .CHAPSecret}}
+  - path: /etc/iscsi/iscsid.conf
+    owner: root
+    permissions: '0644'
+    content: |
+      node.session.auth.authmethod = CHAP
+      node.session.auth.username = {{.CHAPUser}}
+      node.session.auth.password = {{.CHAPSecret}}
+      node.startup = automatic
+  {{- end}}
+  {{- if $proxy }}
+  - path: /etc/environment
+    owner: root
+    permissions: '0644'
+    content: |
+        http_proxy={{$proxy}}
+        https_proxy={{$proxy}}
+        no_proxy={{$no_proxy}}
+        HTTP_PROXY={{$proxy}}
+        HTTPS_PROXY={{$proxy}}
+        NO_PROXY={{$no_proxy}}
+  {{- end}}
+
+{{ if .Connections}}
+# network connections
+# ----------------------------------------------------
+network:
+  version: 1
+  config:
+  {{- $vlan_parent := ""}}
+  {{- range .Connections}}
+  {{- if eq (len .Interfaces) 1}}
+    # single interface
+    {{- $iface := index .Interfaces 0}}
+    - type: physical
+      name: {{$iface.Name}}
+      mac_address: {{$iface.HWAddr}}
+      {{- $vlan_parent = $iface.Name}}
+  {{- else}}
+    # multiple interfaces that are bonded
+    {{- range .Interfaces}}
+    - type: physical
+      name: {{.Name}}
+      mac_address: {{.HWAddr}}
+    {{- end}}
+    - type: bond
+      name: {{.Name}}
+      bond_interfaces:
+      {{- range .Interfaces}}
+      -  {{.Name}}
+      {{- end}}
+      params:
+          bond-mode: 2
+          bond-miimon: 100
+          bond-xmit_hash_policy: 2
+      {{- $vlan_parent = .Name}}
+  {{- end}}
+
+  {{- if eq (len .Networks) 1 }}
+      # single network
+      {{- $net_zero := index .Networks 0 }}
+      {{- $range_zero := index $net_zero.Ranges 0 }}
+      subnets:
+      - type: static
+        address: {{$range_zero.Base}}/{{$range_zero.CIDR}}
+        gateway: {{$range_zero.Gateway}}
+        {{- if $range_zero.DNS}}
+        dns_nameservers:
+          {{- range $range_zero.DNS}}
+          - {{.}}
+          {{- end}}
+        {{- end}}
+  {{- end }}
+  {{- if gt (len .Networks) 1 }}
+
+    # multiple networks with vlans
+    {{- range .Networks}}
+    - type: vlan
+      name: {{$vlan_parent}}.{{.VID}}
+      vlan_link:  {{$vlan_parent}}
+      vlan_id: {{.VID}}
+      {{- $range_zero := index .Ranges 0}}
+      subnets:
+      - type: static
+        address: {{$range_zero.Base}}/{{$range_zero.CIDR}}
+        gateway: {{$range_zero.Gateway}}
+        {{- if $range_zero.DNS}}
+        dns_nameservers:
+          {{- range $range_zero.DNS}}
+          - {{.}}
+          {{- end}}
+        {{- end}}
+      {{- end}}
+  {{- end}}
+  {{- end}}  {{/* range .Connections  */}}
+{{- end}}    {{/* end if .Connections */}}
+
+{{- if $ntp}}
+
+# NTP server information
+# ----------------------------------------------------
+ntp:
+  enabled: true
+  servers:
+  {{- range $ntp}}
+    - {{.}}
+  {{- end}}
+{{- end}}
+
+runcmd:
+  - |
+    curl_cmd="curl --silent --location \
+{{- if $proxy }}
+    --proxy {{$proxy}} \
+{{- end }}
+    "
+    download_url=`${curl_cmd} \
+    https://api.github.com/repos/prometheus/node_exporter/releases/latest | grep browser_download_url.*linux-amd64.tar.gz | cut -d : -f 2,3 | tr -d \"`
+    ${curl_cmd} \
+    ${download_url} > node_exporter.tar.gz
+  - tar zxf node_exporter.tar.gz
+  - mv node_exporter-*/node_exporter /usr/bin
+  - rm -rf node_exporter*
+  - chown node_exporter:node_exporter /usr/bin/node_exporter
+  - chcon -t bin_t /usr/bin/node_exporter
+  - systemctl daemon-reload
+  - systemctl enable node_exporter
+  - systemctl start node_exporter
+{{- if .VolumeAttachments}}
+  # iSCSI Volume attachments
+  # ----------------------------------------------------
+  # This requires host to create with a Volume attached and will setup multipathd to create dm device for it
+  # Once host is up, Metal can add additional volume attachments and user will need to do "iscsiadm -m session --rescan"  # and new dm device will be created.
+  - systemctl enable iscsid
+  - systemctl start iscsid
+  - iscsiadm --mode discovery -t sendtargets  -p "{{.ISCSIDiscoveryAddress  }}"
+  - iscsiadm --mode node --login
+{{- end}}

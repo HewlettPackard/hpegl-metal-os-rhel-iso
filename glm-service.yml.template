@@ -1,0 +1,41 @@
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+---
+name: "BYOI RHEL RHEL_VERSION %YYYYMMDD%"
+type: deploy
+svc_category: %SVC_CATEGORY%
+svc_flavor: %SVC_FLAVOR%
+svc_ver: "%SVC_VER%"
+description: "HPE GLM BYOI Red Hat Enterprise Linux (RHEL) RHEL_VERSION. Telemetry (Prometheus) enabled. \
+This is a .ISO install Service (that installs via Virtual Media) was built on %YYYYMMDD%"
+timeout: 7000
+approach: vmedia
+assumed_boot_method: na
+files:
+  - path: "rhel.iso"
+    file_size: %SIZE%
+    display_url: "%DISPLAY_URL%"
+    secure_url: "%SECURE_URL%"
+    download_timeout: 5000
+    signature: "%SUM%"
+    algorithm: sha256sum
+info:
+  - encoding: "base64"
+    templating: "go-text-template"
+    templating_input: "hostdef-v1"
+    target: "vmedia-cd"
+    path: "/KS.CFG"
+    contents: "%CONTENT1%"
+  - encoding: "base64"
+    templating: "go-text-template"
+    templating_input: "hostdef-v1"
+    target: "vmedia-cd"
+    path: "/92_DATASOURCE.CFG"
+    contents: "%CONTENT2%"
+  - encoding: "none"
+    templating: "go-text-template"
+    templating_input: "hostdef-v1"
+    target: "vmedia-cd"
+    path: "/95_DATASOURCE.CFG"
+    contents: "{{.UserData}}"
+project_use: true
+hoster_use: true

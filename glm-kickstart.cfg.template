@@ -1,0 +1,241 @@
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+
+# This is the main RHEL kickstart file that is templated
+# with hostdef-v1 templated kickstart file from vmedia so
+# that we can use things like the host Ethernet MAC address
+# to select the right network interface for the HTTP install
+# of RHEL packages.
+
+# Most of the host setup with still done with cloud-init
+# after the basic RHEL install via kickstart file. The
+# cloud-init setup is done below at the end of the RHEL
+# install in a kickstart %post section below.
+
+
+# in the %pre section, determine the local storage
+# configuration and save it in /ks-storage.cfg file
+# so that it can be pulled in below via %include
+%pre --interpreter=/usr/bin/bash --log=/root/ks-pre.log
+
+# Since our install method depends on both iLO CDROM and vfloppy
+# devices being present, wait (for up to 30 seconds) until both are present
+for i in `seq 10`; do if [ $(lsblk --scsi | egrep "Virtual Media|Virtual DVD-ROM|Virtual HDD" | wc -l) -eq 2 ]; then break; fi; sleep 3; done
+
+# determine the iLO virtual media devices before starting
+# 'lsblk --scsi' will report:
+#  * 'Virtual Media' for the iLO virtual floppy
+#  * 'Virtual DVD-ROM' for the iLO CD/DVD.
+#  * 'Virtual HDD 0' for the SDFlex RMC.
+# and we want to ignore all of these disks
+# from a RHEL install perspective
+# NOTE: RHEL does not like /dev/sr* in the ignoredisks
+# command so grep that out
+lsblk --scsi | grep -v ^sr | awk '/Virtual Media|Virtual DVD-ROM|Virtual HDD/ { print $1 }' > /ilo-disks.cfg
+
+# now determine the 1st drive that will be the default root disk (if no RAID setup)
+# by getting all block devices, remove ilo-disks, sort (alphabetical order), take 1st one on the list
+DEF_BOOT_DISK=$(lsblk -n --scsi | awk '{ print $1 }' | grep -vf /ilo-disks.cfg | sort | head -1)
+
+# Now process the GLM GO text template storage configuration
+# by adding it to /ks-storage.cfg after expanding ${DEF_BOOT_DISK}
+cat << EOF > /ks-storage.cfg
+
+# In the future TODO, this RHEL recipe should use the file system/etc in
+# the HPE GLM hostdef to setup the RHEL partitions & file systems.
+# For the moment, we are using a hard-coded xfs root file system and
+# ignoring the BMaaS hostdef file systems/etc.
+
+{{/* Determine if the Machine/Host has a RAID logical volume setup */}}
+{{/* and get the RAID logical volume (either UUID/NAA or EUI) for use below */}}
+{{- $raiduuid := "" }}
+{{- $euiraid := "" }}
+{{- if .DeviceLayouts}}
+# .DeviceLayouts: {{.DeviceLayouts}}
+  {{- range .DeviceLayouts}}
+# .Device: {{.Device}}
+    {{- if uuid .Device}}
+# Logical Volume Found via UUID/NAA: {{.Device}}
+      {{- $raiduuid = .Device}}
+    {{- end}}
+    {{- if hasprefix .Device "eui."}}
+# Logical Volume Found via EUI: {{.Device}}
+      {{- $euiraid = trimprefix .Device "eui."}}
+    {{- end}}
+  {{- end}}
+{{- end}}
+
+# Clears any existing partitions on either the specific
+# RAID logical volume or the first disk (${DEF_BOOT_DISK}).
+{{- if $raiduuid}}
+clearpart --all --initlabel --drives=disk/by-id/scsi-3{{lower $raiduuid}}
+{{- else }} {{- if $euiraid}}
+clearpart --all --initlabel --drives=disk/by-id/nvme-eui.{{lower $euiraid}}
+{{- else}}
+clearpart --all --initlabel --drives=${DEF_BOOT_DISK}
+{{- end}}{{- end}}
+
+# Specifies that this is a fresh installation on either the specific
+# RAID logical volume or the first disk (${DEF_BOOT_DISK}).
+{{- if $raiduuid}}
+part /boot --fstype="xfs" --ondisk=disk/by-id/scsi-3{{lower $raiduuid}} --size=2048
+part /boot/efi --fstype="efi" --ondisk=disk/by-id/scsi-3{{lower $raiduuid}} --size=1024 --fsoptions="umask=0077,shortname=winnt"
+part / --fstype="xfs" --ondisk=disk/by-id/scsi-3{{lower $raiduuid}} --grow --size=40000
+part swap --fstype="swap" --ondisk=disk/by-id/scsi-3{{lower $raiduuid}} --size=4000
+{{- else }} {{- if $euiraid}}
+part /boot --fstype="xfs" --ondisk=disk/by-id/nvme-eui.{{lower $euiraid}} --size=2048
+part /boot/efi --fstype="efi" --ondisk=disk/by-id/nvme-eui.{{lower $euiraid}} --size=1024 --fsoptions="umask=0077,shortname=winnt"
+part / --fstype="xfs" --ondisk=disk/by-id/nvme-eui.{{lower $euiraid}} --grow --size=40000
+part swap --fstype="swap" --ondisk=disk/by-id/nvme-eui.{{lower $euiraid}} --size=4000
+{{- else}}
+part /boot --fstype="xfs" --ondisk=${DEF_BOOT_DISK} --size=2048
+part /boot/efi --fstype="efi" --ondisk=${DEF_BOOT_DISK} --size=1024 --fsoptions="umask=0077,shortname=winnt"
+part / --fstype="xfs" --ondisk=${DEF_BOOT_DISK} --grow --size=40000
+part swap --fstype="swap" --ondisk=${DEF_BOOT_DISK} --size=4000
+{{- end}}{{- end}}
+
+# Setup the bootloader configuration either on the specific
+# RAID logical volume or the first disk (${DEF_BOOT_DISK}).
+{{- if $raiduuid}}
+bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=disk/by-id/scsi-3{{lower $raiduuid}}
+{{- else }} {{- if $euiraid}}
+bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=disk/by-id/nvme-eui.{{lower $euiraid}}
+{{- else}}
+bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=${DEF_BOOT_DISK}
+{{- end}}{{- end}}
+
+EOF
+
+# end of %pre section
+%end
+
+
+# accept the End User License Agreement (EULA) without user interaction
+eula --agreed
+
+# Use text mode install
+text
+
+# install from CDROM
+cdrom
+
+# repo
+repo --name="AppStream" --baseurl=file:///run/install/sources/mount-0000-cdrom/AppStream
+
+# Run the Setup Agent on first boot
+firstboot --enable
+
+# Keyboard layouts
+keyboard --xlayouts='us'
+
+# System language
+lang en_US.UTF-8
+
+# Just setup the network connections to do DHCP during the install
+# the cloud-init networking setup the GLM assigned static network config
+{{ if .Connections}}
+  {{- range .Connections}}
+  {{- if eq (len .Interfaces) 1}}
+# single interface
+    {{- $iface := index .Interfaces 0}}
+network --bootproto=dhcp --device={{$iface.HWAddr}} --ipv6=auto --activate
+  {{- else}}
+# multiple interfaces that are bonded
+    {{- range .Interfaces}}
+network --bootproto=dhcp --device={{.HWAddr}} --ipv6=auto --activate
+    {{- end}}
+  {{- end}}
+  {{- end}}  {{/* range .Connections  */}}
+{{- end}}    {{/* end if .Connections */}}
+
+# Include the /ks-storage.cfg file that we generated in the %pre section
+%include "/ks-storage.cfg"
+
+# the required rootpw option. Lock option means
+# "the root user will not be able to log in from the console."
+rootpw --lock
+
+# node_exporter user
+user --name=node_exporter --shell=/sbin/nologin
+
+# don't setup additional user logins
+
+# System services
+services --disabled="chronyd"
+
+# System timezone
+timezone America/Denver --utc
+
+# Firewall configuration
+firewall --disabled
+
+# Poweroff after installation
+poweroff
+
+# minimal package list + a small number of other packages
+%packages --ignoremissing --excludedocs
+@core
+kexec-tools
+cloud-init
+openssh-server
+iscsi-initiator-utils
+xterm
+device-mapper-multipath
+multipath-tools
+tar
+
+services --enabled=acpid,ntpd,sshd,cloud-init,cloud-init-local,cloud-config,cloud-final,multipathd
+
+%end
+
+%addon com_redhat_kdump --enable --reserve-mb='auto'
+
+%end
+
+%post --interpreter=/usr/bin/bash --log=/root/ks-post.log
+
+# create multipath.conf
+cat << EOF > /etc/multipath.conf
+blacklist {
+   devnode "^(ram|raw|loop|fd|md|dm-|sr|scd|st)[0-9]*"
+   devnode "^nvme[0-9]"
+   devnode "^hd[a-z][0-9]*"
+   protocol "scsi:unspec"
+}
+EOF
+
+# unmount RHEL .ISO mounts by %pre section
+umount /mnt/vmedia
+
+# copy the cloud-init configuration files from GreenLake Metal host setup
+# on vmedia-cd to the RHEL root disk /etc/cloud/cloud.cfg.d/
+mkdir -p /mnt/vmedia
+mount /dev/sr0 /mnt/vmedia
+cp /mnt/vmedia/9?_datasource.cfg /etc/cloud/cloud.cfg.d
+umount /mnt/vmedia
+
+# Enable the cloud-init service on post-install boots
+systemctl enable cloud-config cloud-init cloud-init-local cloud-final
+
+# Configure cloud-init for GLM server configuration
+echo "datasource_list: [\"None\"]" >> /etc/cloud/cloud.cfg
+
+# setup serial console login for those ttyS[0-9] devices that
+# are in the kernel log messages
+for i in $(dmesg | awk 'match($0, /ttyS[0-9]+/) { print substr($0, RSTART, RLENGTH) }')
+do
+  systemctl enable getty@$i
+done
+
+# disable password login over SSH (make PasswordAuthentication options 'no')
+grep -q ^PasswordAuthentication /etc/ssh/sshd_config && \
+    sed -i "s/^PasswordAuthentication.*$/PasswordAuthentication no/" /etc/ssh/sshd_config || \
+    echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
+
+# enable root password login from the GreenLake Metal console/serial port
+echo ttyS1 >> /etc/securetty
+
+# remove the /mnt/vmedia now that the umount (above) should be done
+rmdir /mnt/vmedia
+
+# end of %post section
+%end
