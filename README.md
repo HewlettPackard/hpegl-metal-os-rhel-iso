@@ -32,7 +32,7 @@ they should work on other distros/versions. The Linux host will need
 to have the following packages installed for these scripts to run
 correctly:
 
-* genisoimage
+* xorriso
 * isomd5sum
 * syslinux-utils
 
