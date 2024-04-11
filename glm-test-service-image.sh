@@ -1,5 +1,5 @@
 #!/bin/bash
-# (C) Copyright 2023-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2024 Hewlett Packard Enterprise Development LP
 
 # This script will verify that the OS image referred to
 # in a corresponding Bare Metal OS service.yml is correct. This script will verify that it can
