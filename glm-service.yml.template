@@ -1,11 +1,12 @@
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 ---
-name: "BYOI RHEL RHEL_VERSION %YYYYMMDD%"
+name: "BYOI %SVC_FLAVOR% Linux %OS_VERSION% %YYYYMMDD%"
 type: deploy
 svc_category: %SVC_CATEGORY%
 svc_flavor: %SVC_FLAVOR%
 svc_ver: "%SVC_VER%"
-description: "HPE GLM BYOI Red Hat Enterprise Linux (RHEL) RHEL_VERSION. Telemetry (Prometheus) enabled. \
+description: "HPE Bare Metal BYOI %SVC_FLAVOR% Linux %OS_VERSION%. Telemetry (Prometheus) enabled. \
+This service is NOT supported on Gen 9 servers (and trying it on a Gen9 server will generate an error). \
 This is a .ISO install Service (that installs via Virtual Media) was built on %YYYYMMDD%"
 timeout: 7000
 approach: vmedia
@@ -21,21 +22,31 @@ files:
 info:
   - encoding: "base64"
     templating: "go-text-template"
-    templating_input: "hostdef-v1"
+    templating_input: "hostdef-v3"
     target: "vmedia-cd"
     path: "/KS.CFG"
     contents: "%CONTENT1%"
   - encoding: "base64"
     templating: "go-text-template"
-    templating_input: "hostdef-v1"
+    templating_input: "hostdef-v3"
     target: "vmedia-cd"
     path: "/92_DATASOURCE.CFG"
     contents: "%CONTENT2%"
   - encoding: "none"
     templating: "go-text-template"
-    templating_input: "hostdef-v1"
+    templating_input: "hostdef-v3"
     target: "vmedia-cd"
     path: "/95_DATASOURCE.CFG"
     contents: "{{.UserData}}"
 project_use: true
 hoster_use: true
+origin: Custom
+classifiers:
+  - name: Not supported on Gen9
+    rules:
+      - attribute: manufacturer
+        value: HPE
+        operator: contains
+      - attribute: model
+        value: Gen9
+        operator: omitsnocase

@@ -1,5 +1,5 @@
 #cloud-config
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 merge_how:
   - name:     list
     settings: [append]
@@ -32,6 +32,17 @@ users:
 {{- $no_proxy := "" }}
 {{- $ntp := ""}}
 {{- range .Connections }}
+  {{- if gt .UntaggedNet.VID 0 }}
+    {{- range .UntaggedNet.Ranges }}
+      {{- if  .Proxy }}
+        {{- $proxy = .Proxy }}
+        {{- $no_proxy = .NoProxy }}
+      {{- end}}
+      {{- if .NTP}}
+        {{- $ntp = .NTP}}
+      {{- end}}
+    {{- end}}
+  {{- end}}
   {{- range .Networks }}
     {{- range .Ranges }}
       {{- if  .Proxy }}
@@ -129,9 +140,8 @@ network:
       {{- $vlan_parent = .Name}}
   {{- end}}
 
-  {{- if eq (len .Networks) 1 }}
-      # single network
-      {{- $net_zero := index .Networks 0 }}
+  {{- if gt .UntaggedNet.VID 0 }}
+      {{- $net_zero := .UntaggedNet }}
       {{- $range_zero := index $net_zero.Ranges 0 }}
       subnets:
       - type: static
@@ -143,9 +153,14 @@ network:
           - {{.}}
           {{- end}}
         {{- end}}
+        {{- if $range_zero.DNSSearchDomains}}
+        dns_search:
+          {{- range $range_zero.DNSSearchDomains}}
+          - {{.}}
+          {{- end}}
+        {{- end}}
   {{- end }}
-  {{- if gt (len .Networks) 1 }}
-
+  {{- if gt (len .Networks) 0 }}
     # multiple networks with vlans
     {{- range .Networks}}
     - type: vlan
@@ -160,6 +175,12 @@ network:
         {{- if $range_zero.DNS}}
         dns_nameservers:
           {{- range $range_zero.DNS}}
+          - {{.}}
+          {{- end}}
+        {{- end}}
+        {{- if $range_zero.DNSSearchDomains}}
+        dns_search:
+          {{- range $range_zero.DNSSearchDomains}}
           - {{.}}
           {{- end}}
         {{- end}}
@@ -199,13 +220,17 @@ runcmd:
   - systemctl daemon-reload
   - systemctl enable node_exporter
   - systemctl start node_exporter
+  - systemctl enable iscsid
+  - systemctl start iscsid
 {{- if .VolumeAttachments}}
   # iSCSI Volume attachments
   # ----------------------------------------------------
   # This requires host to create with a Volume attached and will setup multipathd to create dm device for it
   # Once host is up, Metal can add additional volume attachments and user will need to do "iscsiadm -m session --rescan"  # and new dm device will be created.
-  - systemctl enable iscsid
-  - systemctl start iscsid
-  - iscsiadm --mode discovery -t sendtargets  -p "{{.ISCSIDiscoveryAddress  }}"
+  {{- range $da := .ISCSIDiscoveryAddressesV3}}
+  - iscsiadm --mode discovery -t sendtargets  -p "{{$da }}"
+  {{- end}}
+  {{- if .ISCSIDiscoveryAddressesV3}}
   - iscsiadm --mode node --login
+  {{- end}}
 {{- end}}

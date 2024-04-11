@@ -1,106 +1,226 @@
-(C) Copyright 2022 Hewlett Packard Enterprise Development LP
-# Table of contents
-* [Building the RHEL image](#building-the-rhel-image)
-* [Customizing the RHEL image](#customizing-the-rhel-image)
-* [Using the RHEL service/image](#using-the-rhel-serviceimage)
+<!-- (C) Copyright 2024 Hewlett Packard Enterprise Development LP -->
+
+RHEL Bring Your Own Image (BYOI) for HPE Private Cloud Enterprise - Bare Metal
+=============================
+
+* [Overview](#overview)
+* [Example of manual build for reference](#example-of-manual-build-for-reference)
+* [Building RHEL image](#building-rhel-image)
+  *   [Setup Linux system for imaging build](#setup-linux-system-for-imaging-build)
+  *   [Downloading recipe repo from GitHub](#downloading-recipe-repo-from-github)
+  *   [Downloading RHEL ISO file](#downloading-rhel-iso-file)
+  *   [Building the Bare Metal RHEL image and service](#building-the-bare-metal-rhel-image-and-service)
+* [Customizing RHEL image](#customizing-rhel-image)
+  *   [Modifying the way the image is built](#modifying-the-way-the-image-is-built)
+* [Using the RHEL service and image](#using-the-rhel-service-and-image)
+  *   [Adding RHEL service to Bare Metal portal](#adding-rhel-service-to-bare-metal-portal)
+  *   [Creating an RHEL Host with RHEL Service](#creating-an-rhel-host-with-rhel-service)
+  *   [Triage of image deployment problems](#triage-of-image-deployment-problems)
+  *   [RHEL License](#rhel-license)
+  *   [Known Observations/Issues](#known-observations-and-issues)
+  *   [RHEL License](#rhel-license)
+  *   [Storage Volumes iSCSI and FC](#storage-volumes-iscsi-and-fc)
+
+
+----------------------------------
 
 # Overview
 
-This github repository contains the script/template files and
-documentation for creating a RHEL service for HPE GreenLake Metal
-(GLM) from a RHEL install .ISO file.
+This GitHub repository contains the script files, template files, and documentation for creating an RHEL service for HPE Bare Metal from an RHEL install .ISO file.  By building a custom image via this process, you can control the exact version of RHEL that is used and modify how RHEL is installed via a kickstart file.  Once the build is done, you can add your new service to the HPE Bare Metal Portal and deploy a host with that new image.  This RHEL recipe has been shown to work with Red Hat Enterprise Linux, Oracle Linux, and Rocky Linux.
 
-# Building the RHEL image
+# Example of manual build for reference
 
-These are the high level steps required to generate the RHEL service:
-* Setup Linux system
-* Downloading recipe repo from github
-* Downloading a RHEL .ISO file
-* Build the GLM RHEL image/service
+Workflow for Building Image:
 
-These are the high level steps required to use this built GLM RHEL
-service/image on GLM:
-* Copy the built GLM RHEL .ISO image to your web server
-* Add the GLM RHEL .YML service file to the appropriate GLM portal
-* In GLM create a host using this OS image service.
+![image](https://github.com/hpe-hcss/bmaas-byoi-rhel-build/assets/90067804/357d6226-7931-4312-b91c-57c9f3f636a7)
 
-## Setup Linux system
+
+Prerequisites:
+```
+1. You will need a Web Server with HTTPS support for storage of the HPE Base Metal images.  The Web Server is anything that:
+   A. You have the ability to upload large .ISO image to and
+   B. The Web Server must be on a network that will be reachable from the HPE On-Premises Controller.  When an OS service/image is used to create an HPE Bare Metal Host the OS images will be downloaded via the secure URL in the service file.
+   NOTE: For this manual build example, a local Web Server "http://10.152.2.125" is used for OS image storage.  For this example, we are assuming that the HPE Bare Metal OS images will be kept in: http://10.152.2.125/images/<.iso>.
+2. Linux machine for building OS image
+   A. Ubuntu 20.04.6 LTS
+   B. Install supporting tools (git, xorriso, and isomd5sum)
+```
+
+Step 1. Source code readiness
+
+A. Clone the GitHub Repo `hpegl-metal-os-rhel-iso`
+```
+git clone https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso.git
+```
+B. Change the directory to `hpegl-metal-os-rhel-iso`
+
+Step 2. Download the RHEL .ISO image to your local build environment via what ever method you prefer (Web Browser, etc)
+
+For example, we will assume that you have downloaded RHEL-9.0.0-20220810.0-x86_64-HPE.iso into the local directory.
+
+Step 3. Run the script `glm-build-image-and-service.sh` to generate an output Bare Metal image .ISO as well as Bare Metal Service .yml:
+
+Example:
+```
+./glm-build-image-and-service.sh \
+  -v 9.0 \
+  -p http://10.152.2.125 \
+  -r qPassw0rd \
+  -i RHEL-9.0.0-20220810.0-x86_64-HPE.iso \
+  -o RHEL-9.0-BareMetal.iso \
+  -s RHEL-9.0-BareMetal.yml
+```
+
+Example test result for reference:
+```
++------------------------------------------------------------------------------------------
+| +----------------------------------------------------------------------------------------
+| | This build has generated a new HPE Bare Metal RHEL service/image
+| | that consists of the following 2 new files:
+| |     RHEL-9.0-BareMetal.iso
+| |     RHEL-9.0-BareMetal.yml
+| |
+| | To use this new Bare Metal RHEL service/image in the HPE Bare Metal, take the following steps:
+| | (1) Copy the new .ISO file (RHEL-9.0-BareMetal.iso)
+| |     to your web server (http://10.152.2.125)
+| |     such that the file can be downloaded from the following URL:
+| |     http://10.152.2.125/images/RHEL-9.0-BareMetal.iso
+| | (2) Use the script "glm-test-service-image.sh" to test that the HPE Bare Metal service
+| |     .yml file points to the expected OS image on the web server with the expected OS image
+| |     size and signature.
+| | (3) Add the Bare Metal Service file (RHEL-9.0-BareMetal.yml) to the HPE Bare Metal Portal
+| |     (https://client.greenlake.hpe-gl-intg.com/). To add the HPE Bare Metal Service file,
+| |     sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".
+| |     Select the Dashboard tile "Metal Consumption" and click on the Tab "OS/application images".
+| |     Click on the button "Add OS/application image" to Upload the OS/application YML file.
+| | (4) Create a Bare Metal host using this OS image service.
+| +----------------------------------------------------------------------------------------
++------------------------------------------------------------------------------------------
+```
+
+Step 4. Copy the output Bare Metal image .ISO to the Web Server.
+
+Step 5. Run the script `glm-test-service-image.sh`, which will verify that the OS image referred to in a corresponding Bare Metal OS service .yml is correct:
+> **_NOTE:_** This script will verify that it can download the OS image and check its length (in bytes) and signature.
+> The script simulates what HPE On-Premises Controller will do when it tries to download and verify an OS image.
+> If this script fails then the Bare Metal OS service .yml file is most likely broken and will not work if loaded into Bare Metal.
+
+Example:
+```
+./glm-test-service-image.sh RHEL-9.0-BareMetal.yml
+```
+
+Test result for reference:
+
+```
+$ ./glm-test-service-image.sh RHEL-9.0-BareMetal.yml
+OS image file to be tested:
+  Secure URL: http://10.152.2.125/images/RHEL-9.0-BareMetal.iso
+  Display URL: RHEL-9.0.0-20220810.0-x86_64-HPE.iso
+  Image size: 8484028416
+  Image signature: ca6235cfb2734bdea71fc3794a32f8b3c71bbc019d15e274e271de668ccc86f1
+  Signature algorithm: sha256sum
+
+wget -O /tmp/os-image-M9V0GR.img http://10.152.2.125/images/RHEL-9.0-BareMetal.iso
+--2024-03-28 17:26:47--  http://10.152.2.125/images/RHEL-9.0-BareMetal.iso
+Connecting to 10.152.2.125:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 8484028416 (7.9G) [application/x-iso9660-image]
+Saving to: ‘/tmp/os-image-M9V0GR.img’
+
+/tmp/os-image-M9V0GR.img                            100%[=================================================================================================================>]   7.90G  85.6MB/s    in 89s
+
+2024-03-28 17:28:16 (90.8 MB/s) - ‘/tmp/os-image-M9V0GR.img’ saved [8484028416/8484028416]
+
+Image Size has been verified ( 8484028416 bytes )
+Image Signature has been verified ( ca6235cfb2734bdea71fc3794a32f8b3c71bbc019d15e274e271de668ccc86f1 )
+The OS image size and signature have been verified
+```
+
+Step 6. Add the Bare Metal service .yml file to the appropriate Bare Metal portal.
+
+Step 7. Create a new Bare Metal host using this OS image service.
+
+
+# Building RHEL image
+
+These are the high-level steps required to generate the Bare Metal RHEL service:
+* Set up a Linux system with 20-40GB of free file system space for the build
+* Set up a local file transfer/storage tool (E.g. Local Web Server with HTTPS support) that Bare Metal can reach over the network.
+* Install Git Version Control (git) and other ISO tools (xorriso and isomd5sum)
+* Downloading recipe repo from GitHub
+* Download a RHEL .ISO file
+* Build the Bare Metal RHEL image/service
+
+These are the high-level steps required to use this built Bare Metal RHEL service/image on Bare Metal:
+* Copy the built Bare Metal RHEL .ISO image to your web server
+* Add the Bare Metal RHEL .YML service file to the appropriate Bare Metal portal
+* In Bare Metal, create a host using this RHEL image service
+
+## Setup Linux system for imaging build
 
 These instructions and scripts are designed to run on a Linux system.
-These instructions were developed and tested on a Ubuntu 18.04 VM, but
-they should work on other distros/versions. The Linux host will need
-to have the following packages installed for these scripts to run
-correctly:
+Further, these instructions were developed and tested on a Ubuntu 20.04 VM, but they should work on other distros/versions.
+The Linux host will need to have the following packages installed for these scripts to run correctly:
 
-* xorriso
-* isomd5sum
-* syslinux-utils
+Packages      | Description
+------------- | ---------------------
+git           | a source code management tool.
+xorriso       | a RockRidge filesystem manipulator, libburnia project.
+isomd5sum     | utilities for working with md5sum implanted in ISO images.
 
-On Ubuntu the necessary packages can be installed with:
-
-```
-sudo apt install genisoimage isomd5sum syslinux-utils
-```
-
-You must also have sudo capability so that you can mount the RHEL ISO
-and copy the files from it to generate a new RHEL .ISO file for
-GreenLake Metal.
-
-The Linux host must have enough free file system space that images can
-be easily generated (20-40GB).
-
-The resulting RHEL .ISO image file from the build needs to be uploaded
-to a web server that the GLM Data Center Controller (DCC) can access
-over the network.  More about this later.
-
-## Downloading recipe repo from github
-
-Once you have an appropriate Linux environment setup, then download
-this recipe from github for building HPE GLM RHEL by:
+On Ubuntu 20.04 VM, the necessary packages can be installed with:
 
 ```
-git clone https://github.com/hpe-hcss/bmaas-byoi-rhel-image.git
+sudo apt install git xorriso isomd5sum
 ```
 
-## Downloading a RHEL .ISO file
+> **_NOTE:_**  You must also have sudo (superuser do) capability so that you can mount the RHEL ISO
+> and copy the files from it to generate a new RHEL .ISO file for Bare Metal.
 
-Next you will need to manually download the appropriate RHEL .ISO onto
-the Linux system.  If you don't already have a source for the RHEL
-.ISO files, then you might want to sign for a FREE Redhat Developer
-account at https://developers.redhat.com/.
+The resulting RHEL .ISO image file from the build, needs to be uploaded to a web server that
+the HPE On-Premises Controller can access over the network.  More about this later.
 
-This RHEL recipe has been successfully test with the following version of RHEL:
+## Downloading recipe repo from GitHub
+
+Once you have an appropriate Linux environment setup, then download this recipe from GitHub
+for building the HPE Bare Metal RHEL by:
+
+```
+git clone https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso.git
+```
+
+## Downloading RHEL .ISO file
+
+Next, you will need to manually download the appropriate RHEL .ISO onto the Linux system.
+This RHEL recipe has been successfully tested with the following list of RHEL distributions and its derivatives:
 * RHEL 8.6
 * RHEL 8.7
 * RHEL 9.0
+* Oracle Linux 9.3
+* Rocky Linux 8.8
 
-This recipe will not work for RHEL 6-7 as it currently exists.
-RHEL 5 and earlier has not been tested.
+> **_NOTE:_**  This recipe should work on other RHEL or RHEL-based distros that support the same kickstart and .ISO construction as recent version of RHEL.
 
-## Building the GLM RHEL image/service
+## Building the Bare Metal RHEL image and service
 
 At this point, you should have a Linux system with:
 * a copy of this repo
 * a standard RHEL .ISO file
 
-We are almost ready to do the build, but we need to know something
-about your environment.  When the build is done, it will generate two
-files:
-* a GLM-modified RHEL .ISO file that needs to be hosted on a web
-  server.  It is assumed that you have (or can setup) a local web
-  server that GLM can reach over the network.  You will also need
-  login credentials on this web server so that you can upload files.
-* a GLM service .YML file that will be used to add the RHEL service to
-  the portal.  This .YML file will have a URL to the GLM modified RHEL
-  .ISO file on the web server.
+We are almost ready to do the build, but we need to know something about your environment.
+When the build is done, it will generate two files:
+* a Bare Metal modified RHEL .ISO file that needs to be hosted on a web server.
+  It is assumed that you have (or can set up) a local web server that Bare Metal can reach over the network.
+  You will also need login credentials on this Web Server so that you can upload the files.
+* a Bare Metal service .YML file that will be used to add the RHEL service to the portal.
+  This .YML file will have a URL to the Bare Metal modified RHEL .ISO file on the web server.
 
-The build needs to know what URL can be used to download the
-GLM-modified RHEL .ISO file. We assume that the URL can be broken into
-2 parts: \<image-url-prefix\>/\<glm-custom-rhel-iso\>
+The build needs to know what URL can be used to download the Bare Metal modified RHEL .ISO file.
+We assume that the URL can be broken into 2 parts: \<image-url-prefix\>/\<bare-metal-custom-rhel-iso\>
 
-If the image URL can't not be constructed with this simple mechanism
-then you probably need to customize this script for a more complex URL
-costruction.
+If the image URL can not be constructed with this simple mechanism, then you probably need to
+customize this script for a more complex URL construction.
 
 So you can run the build with the following command line parameters:
 
@@ -108,317 +228,250 @@ So you can run the build with the following command line parameters:
 ./glm-build-image-and-service.sh \
     -i <rhel-iso-filename> \
     -v <rhel-version-number> \
+    -r <rhel-rootpw> \
     -p <image-url-prefix> \
-    -o <glm-custom-rhel-iso> \
-    -s <glm-yml-service-file>
+    -o <rhel-baremetal-iso> \
+    -s <rhel-baremetal-service-file>
 ```
 
-Here is an example of running the built:
+When an RHEL host is created in the Bare Metal portal, the HPE On-Premises Controller will pull down this Bare Metal modified RHEL .ISO file.
+
+### glm-build-image-and-service.sh - the top-level build script
+
+This is the top-level build script that will take an RHEL install ISO and generate an RHEL service .yml file that can be imported as a Host OS into a Bare Metal portal.
+
+This script 'glm-build-image-and-service.sh' does the following steps:
+* process command line arguments.
+* Customize the RHEL .ISO so that it works for Bare Metal.  Run: `glm-image-build.sh`
+* Generate the Bare Metal service file for this Bare Metal image that we just generated. Run: `glm-service-build.sh`
+
+Usage:
 
 ```
 ./glm-build-image-and-service.sh \
-   -i RHEL-7.9-20200917.0-Server-x86_64-dvd1.iso \
-   -v 7.9 \
-   -p http://192.169.1.131 \
-   -o glm-metal-rhel.iso
-   -s glm-metal-rhel-service.yml
+    -i <rhel-iso-filename> \
+    -v <rhel-version-number> \
+    -r <rhel-rootpw> \
+    -p <image-url-prefix> \
+    -o <rhel-baremetal-iso> \
+    -s <rhel-baremetal-service-file>
 ```
 
-At the end of script run, it will output the following instructions for next steps:
-```
-+------------------------------------------------------------------------------------------
-| +----------------------------------------------------------------------------------------
-| | This build has generated a new GreenLake Metal (GLM) RHEL service/image
-| | that consists of the following 2 new files:
-| |     glm-metal-rhel.iso
-| |     glm-metal-rhel-service.yml
-| |
-| | To use this new GLM RHEL service/image in HPE GLM take the following steps:
-| | (1) Copy the new .ISO file (glm-metal-rhel.iso) to your web server (http://192.169.1.131)
-| |     such that the file can be downloaded from the following URL:
-| |     http://192.169.1.131/glm-metal-rhel.iso
-| | (2) Add the GreenLake Metal Service file to your GLM Portal using this command:
-| |     qctl services create -f glm-metal-rhel-service.yml
-| | (3) Create a host in GLM using this OS image service.
-| +----------------------------------------------------------------------------------------
-+------------------------------------------------------------------------------------------
-```
+Command Line Options                | Description
+------------------------------------| -----------
+-i \<rhel-iso-filename\>            | local filename of the standard RHEL .ISO file that was already downloaded. Used as input file.
+-v \<rhel-version-number\>          | a x.y RHEL version number.  Example: -v 7.9
+-o \<rhel-baremetal-iso\>           | local filename of the Bare Metal modified RHEL .ISO file that will be output by the script.  This file should be uploaded to your web server.
+-p \<image-url-prefix\>             | the beginning of the image URL (on your web server). Example: -p http://192.168.1.131.
+-s \<rhel-baremetal-service-file\>  | local filename of the Bare Metal .YML service file that will be output by the script.  This file should be uploaded to the Bare Metal portal.
 
-When a RHEL host is created in the GLM portal, the GLM DCC will pull
-down this GLM-modified RHEL .ISO file.
+> **_NOTE:_**  The users of this script are expected to copy the \<rhel-baremetal-iso\> .ISO file to your web server
+> such that the file is available at this constructed URL: \<image-url-prefix\>/\<rhel-baremetal-iso\>.
+> The Bare Metal service .YML will assume that the image file will be available at a URL constructed with \<image-url-prefix\>/\<rhel-baremetal-iso\>.
 
-### glm-build-image-and-service.sh - top level build script
+### glm-image-build.sh - Customize RHEL.ISO for Bare Metal
 
-This is the top level build script will take a RHEL install ISO and
-generate a RHEL service.yml file the can be imported as a Host OS into
-a GreenLake Metal portal.
-
-glm-build-image-and-service.sh does the following steps:
-* process command line arguements.
-* Customize the RHEL .ISO so that it works for GLM.  Run: glm-image-build.sh.
-* Generate GLM service file for this GLM image that we gjust generated. Run: glm-service-build.sh.
-
-glm-build-image-and-service.sh usage:
-
-```
-glm-build-image-and-service.sh -i <rhel-iso-filename> -o <glm-custom-rhel-iso>
-    -v <rhel-version-number> -p <image-url-prefix> -s <glm-yml-service-file>
-```
-
-glm-build-image-and-service.sh command line options | Description
-----------------------------------------------------| -----------
--i \<rhel-iso-filename\>     | local filename of the standard RHEL .ISO file that was already downloaded. Used as input file.
--v \<rhel-version-number\>   | a x.y RHEL version number.  Example: -v 7.9
--o \<glm-custom-rhel-iso\>   | local filename of the GLM-modified RHEL .ISO file that will be output by the script.  This file should be uploaded to your web server.
--p \<image-url-prefix\>      | the beginning of the image URL (on your web server). Example: -p http://192.168.1.131.  The GLM service .YML will assume that the image file will be available at a URL constructed with \<image-url-prefix\>/\<glm-custom-rhel-iso\>.
--s \<glm-yml-service-file\>  | local filename of the GLM .YML service file that will be output by the script.  This file should be uploaded to the GLM portal.
-
-NOTE: The user's of this script are expected to copy the
-\<glm-custom-rhel-iso\> .ISO file to your web server such that the file
-is available at this constructed URL:
-\<image-url-prefix\>/\<glm-custom-rhel-iso\>
-
-### glm-image-build.sh - Customize RHEL.ISO for GLM
-
-This script will repack a RHEL .ISO file for a GLM RHEL install service
-that uses Virtual Media to get the install started.
+This script `glm-image-build.sh` will repack an RHEL .ISO file for a Bare Metal RHEL install service that uses Virtual Media to
+get the installation started.
 
 The following changes are being made to the RHEL .ISO:
-  1. configure to use a kickstart file on the iLO vmedia-cd and to
-     pull the RPM packages (stage2) over vmedia
-  2. setup for a text based install (versus a GUI install)
+  1. configure to use a kickstart file on the iLO vmedia-cd and to pull the RPM packages (stage2) over vmedia
+  2. setup for a text-based install (versus a GUI install)
   3. set up the console to the iLO serial port (/dev/ttyS1)
-  4. eliminate the 'media check' when installing so that
-     we get faster deployments (and parity with TGZ installs)
+  4. eliminate the 'media check' when installing so that we get faster deployments (and parity with TGZ installs)
 
-The RHEL .ISO is configured to use a kickstart file on the iLO
-vmedia-cd by adding the 'inst.ks=hd:sr0:/ks.cfg' option in
-GRUB (used in UEFI) and isolinux (used in BIOS) configuration
-files. This option configures RHEL installer to pull the
-kickstart file from the root of the cdrom at /ks.cfg.  This
-kickstart option is setup by modifying the following files
+The RHEL .ISO is configured to use a kickstart file on the iLO vmedia-cd by adding the 'inst.ks=hd:sr0:/ks.cfg' option in
+GRUB (used in UEFI) and isolinux (used in BIOS) configuration files. This option configures the RHEL installer to pull the
+kickstart file from the root of the cdrom at /ks.cfg.  This kickstart option is setup by modifying the following files
 on the .ISO:
   isolinux/isolinux.cfg for BIOS
   EFI/BOOT/grub.cfg for UEFI
 
 Usage:
 ```
-glm-build-image-and-service.sh -i <rhel.iso> -v <version> -o <glm-customizied-rhel.iso>
+glm-image-build.sh \
+    -i <rhel.iso> \
+    -o <rhel-baremetal.iso>
 ```
 
-command line options          | Description
------------------------------ | -----------
+Command Line Options            | Description
+------------------------------- | -----------
 -i \<rhel.iso\>                 | Input RHEL .ISO filename
--v \<version\>                  | RHEL version number x.y
--o \<glm-customizied-rhel.iso\> | Output GLM RHEL .ISO file
+-o \<rhel-baremetal.iso\>       | Output Bare Metal RHEL .ISO file
+
+Example:
+
+```
+sudo ./glm-image-build.sh \
+    -i RHEL-9.0.0-20220810.0-x86_64-HPE.iso \
+    -o RHEL-9.0-BareMetal.iso
+```
 
 Here are the detailed changes that are made to the RHEL .ISO:
 * change the default timeout to 5 seconds (instead of 60 seconds)
 * change the default menu selection to the 1st entry (no media check)
 * add the 'init.ks=hd:sr0:/ks.cfg' option to the various lines in the file
 * also setup the serial console to ttyS1 (iLO serial port) with 115200 baud
-* remove the 'quiet' option so the user can watch kernel loading
-  and use to triage any problems
+* remove the 'quiet' option so the user can watch kernel loading and use to triage any problems
 
-### glm-service-build.sh - Generate GLM .YML service file
+### glm-service-build.sh - Generate Bare Metal .YML service file
 
-This script generates a GreenLake Metal OS service.yml file
-appropriate for uploading to a GLM portal(s).
+This script `glm-service-build.sh` generates a Bare Metal OS service .yml file appropriate for uploading to a Bare Metal portal(s).
 
 Usage:
 ```
-glm-service-build.sh -s <service-template> -o <service_yml_filename>
-      -c <svc_category> -f <scv_flavor> -v <svc_ver>
-      -d <display_url> -u <secure_url>
-      -i <local_image_filename> [ -t <os-template> ]
+glm-service-build.sh \
+    -s <service-template> \
+    -o <service_yml_filename> \
+    -c <svc_category> \
+    -f <scv_flavor> \
+    -v <svc_ver> \
+    -d <display_url> \
+    -u <secure_url> \
+    -i <local_image_filename> [ -t <os-template> ]
 ```
 
-command line options      | Description
-------------------------- | -----------
+Command Line Options        | Description
+--------------------------- | -----------
 -s \<service-template\>     | service template filename (input file)
 -o \<service_yml_filename\> | service filename (output file)
--c \<svc_category\>         | GreenLake Metal service category
--f \<scv_flavor\>           | GreenLake Metal service flavor
--v \<svc_ver\>              | GreenLake Metal service version
--d \<display_url\>          | used to display the image URL in user interface
+-c \<svc_category\>         | the Bare Metal service category
+-f \<scv_flavor\>           | the Bare Metal service flavor
+-v \<svc_ver\>              | the Bare Metal service version
+-d \<display_url\>          | used to display the image URL in the user interface
 -u \<secure_url\>           | the real URL to the image file
 -i \<local_image_filename\> | a full path to the image for this service. Used to get the .ISO sha256sum and size.
 [ -t \<os-template\> ]      | info template files. 1st -t option should be %CONTENT1% in service-template. 2nd -> %CONTENT2%.
 
-# Customizing the RHEL image
+Example:
+```
+./glm-service-build.sh \
+    -s /tmp/glm-service.cfg.5k70efrzd \
+    -o RHEL-9.0-BareMetal.yml \
+    -c linux \
+    -f RHEL \
+    -v 9.0-20240328-BYOI \
+    -u http://10.152.2.125/images/RHEL-9.0-BareMetal.iso \
+    -d RHEL-9.0.0-20220810.0-x86_64-HPE.iso \
+    -i RHEL-9.0-BareMetal.iso \
+    -t glm-kickstart.cfg.template \
+    -t glm-cloud-init.template
+```
+
+### glm-test-service-image.sh - Verify the Bare Metal OS image
+
+This script `glm-test-service-image.sh` will verify that the OS image referred to in a corresponding Bare Metal OS service. yml is correct.
+
+Usage:
+```
+glm-test-service-image.sh <rhel-baremetal-service-file>
+```
+
+Command Line Options             | Description
+-------------------------------- | -----------
+\<rhel-baremetal-service-file\>  | service filename (output file)
+
+Example:
+```
+./glm-test-service-image.sh RHEL-9.0-BareMetal.yml
+```
+
+# Customizing RHEL image
 
 The RHEL image/service can be customized by:
 * Modifying the way the image is built
 * Modifying the RHEL kickstart file
-* Modifying the cloud-init
 
 ## Modifying the way the image is built
+
 Here is a description of the files in this repo:
 
-Filename     | Description
--------------| -----------
-README.md | This documentation
-glm-build-image-and-service.sh | This is the top level build script will take a RHEL install ISO and generate a RHEL service.yml file the can be imported as a Host OS into a GreenLake Metal portal.
-glm-image-build.sh | This script will repack RHEL .ISO file for a GLM RHEL install service that uses Virtual Media to get the install started.
-glm-service-build.sh | This script generates a GreenLake Metal OS service.yml file appropriate for uploading the service to a GLM portal(s).
-glm-service-cloud-init.template | This is the cloud-init template file that GLM will use to setup cloud-init to run on the 1st boot.
-glm-service-ks-hostdef.cfg.template | A RHEL kickstart file (templated with hostdef-v1) that is included into the core kickstart file.
-glm-service-ks-install-env.cfg.template | The core RHEL kickstart file (templated with install-env-v1)
-glm-service-rhel-service.yml.template | This is the GLM .YML service file template.
+Filename                       | Description
+------------------------------ | -----------
+README.md                      | This documentation
+glm-build-image-and-service.sh | This is the top-level build script that will take an RHEL install ISO and generate an RHEL service .yml file that can be imported as a Host OS into a Bare Metal portal.
+glm-image-build.sh             | This script will repack the RHEL .ISO file for a Bare Metal RHEL install service that uses Virtual Media to get the installation started.
+glm-service-build.sh           | This script generates a Bare Metal OS service .yml file appropriate for uploading the service to a Bare Metal portal(s).
+glm-test-service-image.sh      | This script will verify that the OS image referred to in a corresponding Bare Metal OS service .yml is correct.
+glm-kickstart.cfg.template     | The core RHEL kickstart file (templated with install-env-v1)
+glm-service.yml.template       | This is the Bare Metal .YML service file template.
 
-Feel free to modify these file to suite your specifc needs.  General
-changes that you want to contribute back via a pull request are much
-appreciated.
-
-*The license for this repo has yet to be determined*.
+Feel free to modify these files to suit your specific needs.
+General changes that you want to contribute back via a pull request are much appreciated.
 
 ## Modifying the RHEL kickstart file
 
-The RHEL kickstart file is the basis of the automated install of RHEL
-supplied by this recipe.  Many additional changes to either of the
-kickstart files are possible to customize to your needs.
+The RHEL kickstart file is the basis of the automated install of RHEL supplied by this recipe.
+Many additional changes to either of the kickstart files are possible to customize to your needs.
 
-## Customizing installed RHEL packages (via kickstart)
+# Using the RHEL service and image
 
-The RHEL install is driven by the primary kickstart file that is saved as input/templates/ks-install-env.cfg.template in this repo.  In the middle of this file is a package list that looks like this:
+## Adding RHEL service to Bare Metal portal
 
-```
-# minimal package list + cloud-init
-%packages --ignoremissing --excludedocs
-@^minimal
-@core
-kexec-tools
-cloud-init
-openssh-server
-iscsi-initiator-utils
-xterm
-```
-
-Feel free to additional packages to list (as long ar the packages are on the RHEL .ISO).
-
-Additional package can also be added when cloud-init runs if you
-prefer that.
-
-## Modifying the cloud-init
-
-This service uses cloud-init to customize the deployed image after a kickstart-driven RHEL install.
-The cloud-init template is saved in this repo as glm-service-cloud-init.template.  Customizations of this file are possible.
-
-# Using the RHEL service/image
-
-## Adding RHEL service to GLM portal
-
-When the build script completes successfully you will find the following
-instructions there for how to add this image into your HPE GreenLake Metal
-portal.  For example:
+When the build script completes successfully, you will find the following instructions to add this image to your HPE Bare Metal portal.
+For example:
 
 ```
 +------------------------------------------------------------------------------------------
 | +----------------------------------------------------------------------------------------
-| | This build has generated a new GreenLake Metal (GLM) RHEL service/image
+| | This build has generated a new HPE Bare Metal RHEL service/image
 | | that consists of the following 2 new files:
-| |     glm-metal-rhel.iso
-| |     glm-metal-rhel-service.yml
+| |     RHEL-9.0-BareMetal.iso
+| |     RHEL-9.0-BareMetal.yml
 | |
-| | To use this new GLM RHEL service/image in HPE GLM take the following steps:
-| | (1) Copy the new .ISO file (glm-metal-rhel.iso) to your web server (http://192.169.1.131)
+| | To use this new Bare Metal RHEL service/image in the HPE Bare Metal, take the following steps:
+| | (1) Copy the new .ISO file (RHEL-9.0-BareMetal.iso)
+| |     to your web server (http://10.152.2.125)
 | |     such that the file can be downloaded from the following URL:
-| |     http://192.169.1.131/glm-metal-rhel.iso
-| | (2) Add the GreenLake Metal Service file to your GLM Portal using this command:
-| |     qctl services create -f glm-metal-rhel-service.yml
-| | (3) Create a host in GLM using this OS image service.
+| |     http://10.152.2.125/images/RHEL-9.0-BareMetal.iso
+| | (2) Use the script "glm-test-service-image.sh" to test that the HPE Bare Metal service
+| |     .yml file points the expected OS image on the web server with the expected OS image
+| |     size and signature.
+| | (3) Add the Bare Metal Service file (RHEL-9.0-BareMetal.yml) to the HPE Bare Metal Portal
+| |     (https://client.greenlake.hpe-gl-intg.com/). To add the HPE Bare Metal Service file,
+| |     sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".
+| |     Select the Dashboard tile "Metal Consumption" and click on the Tab "OS/application images".
+| |     Click on the button "Add OS/application image" to Upload the OS/application YML file.
+| | (4) Create a Bare Metal host using this OS image service.
 | +----------------------------------------------------------------------------------------
 +------------------------------------------------------------------------------------------
 ```
 
 Follow the instructions as directed!
 
-## Creating a RHEL Host with RHEL Service
+## Creating an RHEL Host with RHEL Service
 
-## Triage of image deloyment problems
+Create a host in Bare Metal using this OS image service.
 
-After you have created your custom RHEL image/server and created a
-host using this new service, you will want to monitor the deployment
-so for the first few times to make sure things are going as expected.
-Here are some points to node:
-  * This image/service is setup to output to the serial console during
-    RHEL deployment and watching the serial console is the easiest way
-    to monitor the RHEL dployment/installation.
-  * HPE GreeLake Metal tools do not monitor the serial port(s) at this
-    time so if an error is generated by the RHEL installer, the GLM
-    tools will not know about it.
-  * Sometimes for more difficult OS deployment problems you might want
-    to gain access to the servers iLO so that you can monitor it that
-    way.  See you GLM administrator.
+## Triage of image deployment problems
 
-## Known problems/limitations with this image
+After you have created your custom RHEL image/server and created a host using this new service, you will want to monitor the deployment so for the first few times, make sure things are going as expected.
+Here are some points to note:
+  * This image/service is set to output to the serial console during RHEL deployment and watching the serial console is the easiest way to monitor the RHEL deployment/installation.
+  * HPE GreenLake Metal tools do not monitor the serial port(s) at this time so if an error is generated by the RHEL installer, the Bare Metal tools will not know about it.
+  * Sometimes for more difficult OS deployment problems you might want to gain access to the servers iLO so that you can monitor it that way. See your Bare Metal administrator.
 
-* There are several arbitrary setting for the file system settings (file system type,
-  size of partition, etc) that are embedded in the kickstart file in this RHEL OS image
-  (see glm-service-ks-hostdef.cfg.template).
-* This RHEL service will set a LVM volume using all available storage on the server.
-  This is probably not the desired behavior for all situations but it does make the
-  service more robust (works when there is not sda but other storage is present).
-  This will change when we get more RAID setup support implemented.
-* There is NO automated installation of ProLiant Support Packs or other HPE
-  software that might be recommended for RHEL on HPE servers.
+## Known Observations and Issues
 
-## Login Credentials
-
-This GLM RHEL recipe (by default) when deployed will:
-* Not create a non-root user login. Neither the GLM RHEL kickstart nor
-  cloud-init files will create any user beyond the root user,
-* Not create a root password.  Neither the GLM RHEL kickstart nor
-  cloud-init files will setup any root password,
-* The SSH Keys supplied in the GLM Host creation are added to the root
-  user by the cloud-init file (see glm-service-cloud-init.template).
-
-The implications of the default setup are:
-* Because there is no user with a password setup, there is no way to
-  login to the RHEL host via the GLM serial console,
-* The only way to login is via the root user via ssh and the GLM
-  installed SSH Keys,
-* If you want to create another non-root user account then you can add
-  that to either the kickstart or cloud-init files as desired.
+<1> For Oracle Linux
+About Issue: Services (sshd/cloud-init) found inactive. This results into an error `sshd: no hostkeys available -- exiting` and User can not SSH to the host.
+About Fix: Reboot the Host once. Reboot will bring up the host with active sshd services and required host keys.
+Reference file: '/etc/systemd/system/sshd-keygen@.service.d/disable-sshd-keygen-if-cloud-init-active.conf'
+```
+# In some cloud-init enabled images the sshd-keygen template service may race with cloud-init
+# during boot causing issues with host key generation.  This drop-in config adds a condition
+# to sshd-keygen@.service if it exists and prevents the sshd-keygen units from running
+# *if* cloud-init is going to run.
+[Unit]
+ConditionPathExists=!/run/systemd/generator.early/multi-user.target.wants/cloud-init.target
+```
 
 ## RHEL License
 
-RHEL is a licensed software and users need to have a valid license key
-from RedHat to use RHEL.  This install service does nothing to setup a
-RHEL license key in any way.  Users are expected to manually use RHEL
-tools to setup a RHEL license on the host.
+RHEL is a licensed software and users need to have a valid license key from RedHat to use RHEL.
+This install service does nothing to set up an RHEL license key in any way.
+Users are expected to manually use RHEL tools to set up an RHEL license on the host.
 
-## Network Setup
+## Storage Volumes iSCSI and FC
 
-Host network setup should happen automatically.  To validate the
-network connectivity with curl for example:
-
-```
-[user@host ~]$ curl -k https://google.com
-<HTML><HEAD><meta http-equiv="content-type" content="text/html;charset=utf-8">
-<TITLE>301 Moved</TITLE></HEAD><BODY>
-<H1>301 Moved</H1>
-The document has moved
-<A HREF="https://www.google.com/">here</A>.
-</BODY></HTML>
-[user@host ~]$
-```
-
-The GreenLake Metal will setup the cloud-init files
-`/etc/cloud/clod.cfg.d/9?_datasource.cfg`.  If the network setup is
-not right in these cloud-init files then it will never be right on the
-deployed host.  To validate the deployment of the cloud-init files see
-`/var/log/cloud-init-output.log`.
-
-## iSCSI (Nimble/etc) Setup
-
-When a host is setup with a iSCSI (Nimble/etc) volume then the Nimble
-volume should be automatcally setup, for example:
-
-```
-[root@host ~]# lsscsi
-[0:0:0:0]    cd/dvd  iLO      Virtual DVD-ROM        /dev/sr0
-[1:0:0:0]    disk    ATA      MM1000GFJTE      HPG5  /dev/sda
-[7:0:0:0]    disk    Nimble   Server           1.0   /dev/sdb
-[root@host ~]#
-```
+When a Bare Metal host is set up with iSCSI or FC volumes, the storage volume should be automatically available.
