@@ -1,14 +1,14 @@
 #!/bin/bash
-# (C) Copyright 2018-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2018-2022, 2024 Hewlett Packard Enterprise Development LP
 
-# This is the top level build script will take a RHEL install ISO and
-# generate a RHEL service.yml file the can be imported as a Host OS into
-# a GreenLake Metal portal.
+# This is the top-level build script that will take an RHEL install ISO and
+# generate a RHEL service.yml file that can be imported as a Host OS into
+# a Bare Metal portal.
 
 # glm-build-image-and-service.sh does the following steps:
 # * process command line arguements.
-# * Customize the RHEL .ISO so that it works for GLM.  Run: glm-image-build.sh.
-# * Generate GLM service file that is specific to $RHEL_VER. Run: glm-service-build.sh.
+# * Customize the RHEL .ISO so that it works for Bare Metal.  Run: glm-image-build.sh.
+# * Generate Bare Metal service file that is specific to $OS_VER. Run: glm-service-build.sh.
 
 # glm-build-image-and-service.sh usage:
 # glm-build-image-and-service.sh -i <rhel-iso-filename> -o <glm-custom-rhel-iso>
@@ -21,18 +21,20 @@
 # -------------------------- | -----------
 # -v <rhel-version-number>   | a x.y RHEL version number.  Example: -v 7.9
 # -------------------------- | -----------
-# -o <glm-custom-rhel-iso>   | local filename of the GLM-modified RHEL .ISO file
+# -r <rootpw>                | set the RHEL OS root password
+# -------------------------- | -----------
+# -o <glm-custom-rhel-iso>   | local filename of the Bare Metal modified RHEL .ISO file
 #                            | that will be output by the script.  This file should
 #                            | be uploaded to your web server.
 # -------------------------- | -----------
 # -p <image-url-prefix>      | the beginning of the image URL (on your web server).
-#                            | Example: -p http://192.168.1.131.  The GLM service .YML
+#                            | Example: -p http://192.168.1.131.  The Bare Metal service .YML
 #                            | will assume that the image file will be available at
 #                            | a URL constructed with <image-url-prefix>/<glm-custom-rhel-iso>.
 # -------------------------- | -----------
-# -s <glm-yml-service-file>  | local filename of the GLM .YML service file that
+# -s <glm-yml-service-file>  | local filename of the Bare Metal .YML service file that
 #                            | will be output by the script.  This file should
-#                            | be uploaded to the GLM portal.
+#                            | be uploaded to the Bare Metal portal.
 # -------------------------- | -----------
 
 # NOTE: The user's of this script are expected to copy the
@@ -48,24 +50,26 @@
 # following packages to be installed:
 #
 # on Debian/Ubuntu:
-#  sudo apt install genisoimage isomd5sum syslinux-utils
+#  sudo apt install xorriso isomd5sum
 
 set -euo pipefail
 
 # required parameters
 RHEL_ISO_FILENAME=""
 GLM_CUSTOM_RHEL_ISO=""
-RHEL_VER=""
+OS_VER=""
+RHEL_ROOTPW=""
 IMAGE_URL_PREFIX=""
 GLM_YML_SERVICE_FILE=""
 GLM_YML_SERVICE_TEMPLATE=""
 
-while getopts "i:v:o:p:s:" opt
+while getopts "i:v:r:o:p:s:" opt
 do
     case $opt in
         # required parameters
         i) RHEL_ISO_FILENAME=$OPTARG ;;
-        v) RHEL_VER=$OPTARG ;;
+        v) OS_VER=$OPTARG ;;
+        r) RHEL_ROOTPW=$OPTARG ;;
         o) GLM_CUSTOM_RHEL_ISO=$OPTARG ;;
         p) IMAGE_URL_PREFIX=$OPTARG ;;
         s) GLM_YML_SERVICE_FILE=$OPTARG ;;
@@ -75,10 +79,11 @@ done
 # Check that required parameters exist.
 if [ -z "$RHEL_ISO_FILENAME" -o \
      -z "$GLM_CUSTOM_RHEL_ISO" -o \
-     -z "$RHEL_VER" -o \
+     -z "$OS_VER" -o \
+     -z "$RHEL_ROOTPW" -o \
      -z "$IMAGE_URL_PREFIX" -o \
      -z "$GLM_YML_SERVICE_FILE" ]; then
-  echo "script usage: $0 -i rhel-iso -v rhel-version" >&2
+  echo "script usage: $0 -i rhel-iso -v rhel-version -r rhel-rootpw" >&2
   echo "              -o glm-custom-rhel-iso -p http-prefix -s glm-yml-service-file" >&2
   exit 1
 fi
@@ -98,9 +103,9 @@ clean() {
 
 trap clean EXIT
 
-# if the GLM customizied RHEL .ISO has not aleady been generated.
+# if the Bare Metal customized RHEL .ISO has not already been generated.
 if [ ! -f $GLM_CUSTOM_RHEL_ISO ]; then
-   # Customize the RHEL .ISO so that it works for GLM.
+   # Customize the RHEL .ISO so that it works for Bare Metal.
    GEN_IMAGE="sudo ./glm-image-build.sh \
       -i $RHEL_ISO_FILENAME \
       -o $GLM_CUSTOM_RHEL_ISO"
@@ -109,16 +114,32 @@ if [ ! -f $GLM_CUSTOM_RHEL_ISO ]; then
 fi
 
 GLM_YML_SERVICE_TEMPLATE=$(mktemp /tmp/glm-service.cfg.XXXXXXXXX)
-sed -e "s/RHEL_VERSION/$RHEL_VER/g" glm-service.yml.template > $GLM_YML_SERVICE_TEMPLATE
+sed -e "s/%OS_VERSION%/$OS_VER/g" glm-service.yml.template > $GLM_YML_SERVICE_TEMPLATE
 
-# Generate HPE GLM service file.
+# set the root password in the KS configuration file
+sed -i "s/%ROOTPW%/$RHEL_ROOTPW/g" glm-kickstart.cfg.template
+
+# extract the Service Flavor from the GLM_CUSTOM_RHEL_ISO
+# such that GLM_CUSTOM_RHEL_ISO contains the word RHEL|Oracle|Rocky
+if [ `echo $(basename $GLM_CUSTOM_RHEL_ISO) | grep -i RHEL` ]; then
+   SVC_FLAVOR=RHEL
+elif [ `echo $(basename $GLM_CUSTOM_RHEL_ISO) | grep -i Rocky` ]; then
+   SVC_FLAVOR=Rocky
+elif [ `echo $(basename $GLM_CUSTOM_RHEL_ISO) | grep -i Oracle` ]; then
+   SVC_FLAVOR=Oracle
+else
+   echo "ERROR could not figure out the service flavor from the ISO name $(basename $GLM_CUSTOM_RHEL_ISO)"
+   exit 1
+fi
+
+# Generate HPE Bare Metal service file.
 YYYYMMDD=$(date '+%Y%m%d')
 GEN_SERVICE="./glm-service-build.sh \
   -s $GLM_YML_SERVICE_TEMPLATE \
   -o $GLM_YML_SERVICE_FILE \
   -c linux \
-  -f RHEL \
-  -v $RHEL_VER-$YYYYMMDD-BYOI \
+  -f $SVC_FLAVOR \
+  -v $OS_VER-$YYYYMMDD-BYOI \
   -u $IMAGE_URL_PREFIX/$GLM_CUSTOM_RHEL_ISO
   -d $RHEL_ISO_FILENAME \
   -i $GLM_CUSTOM_RHEL_ISO \
@@ -127,23 +148,32 @@ GEN_SERVICE="./glm-service-build.sh \
 echo $GEN_SERVICE
 $GEN_SERVICE
 
+# unset the root password in the KS configuration file
+sed -i '/rootpw/c\rootpw %ROOTPW%' glm-kickstart.cfg.template
+
 # print out instructions for using this image & service
 cat << EOF
 +------------------------------------------------------------------------------------------
 | +----------------------------------------------------------------------------------------
-| | This build has generated a new GreenLake Metal (GLM) RHEL service/image
+| | This build has generated a new HPE Bare Metal $SVC_FLAVOR service/image
 | | that consists of the following 2 new files:
 | |     $GLM_CUSTOM_RHEL_ISO
 | |     $GLM_YML_SERVICE_FILE
 | |
-| | To use this new GLM RHEL service/image in HPE GLM take the following steps:
+| | To use this new Bare Metal $SVC_FLAVOR service/image in Bare Metal, take the following steps:
 | | (1) Copy the new .ISO file ($GLM_CUSTOM_RHEL_ISO)
 | |     to your web server ($IMAGE_URL_PREFIX)
 | |     such that the file can be downloaded from the following URL:
 | |     $IMAGE_URL_PREFIX/$GLM_CUSTOM_RHEL_ISO
-| | (2) Add the GreenLake Metal Service file to your GLM Portal using this command:
-| |     qctl services create -f $GLM_YML_SERVICE_FILE
-| | (3) Create a host in GLM using this OS image service.
+| | (2) Use the script "glm-test-service-image.sh" to test that the HPE Bare Metal service
+| |     .yml file points to the expected OS image on the web server with the expected OS image
+| |     size and signature.
+| | (3) Add the Bare Metal Service file ($GLM_YML_SERVICE_FILE) to the HPE Bare Metal Portal
+| |     (https://client.greenlake.hpe-gl-intg.com/). To add the HPE Metal Service file,
+| |     sign in to the Bare Metal Portal and select the Tenant by clicking "Go to tenant".
+| |     Select the Dashboard tile "Metal Consumption" and click on the Tab "OS/application images".
+| |     Click on the button "Add OS/application image" to Upload the OS/application YML file.
+| | (4) Create a Bare Metal host using this OS image service.
 | +----------------------------------------------------------------------------------------
 +------------------------------------------------------------------------------------------
 EOF

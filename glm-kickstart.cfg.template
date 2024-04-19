@@ -1,7 +1,7 @@
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022, 2024 Hewlett Packard Enterprise Development LP
 
 # This is the main RHEL kickstart file that is templated
-# with hostdef-v1 templated kickstart file from vmedia so
+# with hostdef-v3 templated kickstart file from vmedia so
 # that we can use things like the host Ethernet MAC address
 # to select the right network interface for the HTTP install
 # of RHEL packages.
@@ -23,14 +23,15 @@ for i in `seq 10`; do if [ $(lsblk --scsi | egrep "Virtual Media|Virtual DVD-ROM
 
 # determine the iLO virtual media devices before starting
 # 'lsblk --scsi' will report:
-#  * 'Virtual Media' for the iLO virtual floppy
+#  * 'Virtual Media' for the iLO virtual floppy.
+#  * 'Virtual USB Key' for the iLO USB Key.
 #  * 'Virtual DVD-ROM' for the iLO CD/DVD.
-#  * 'Virtual HDD 0' for the SDFlex RMC.
+#  * 'Virtual HDD' for the SDFlex RMC.
 # and we want to ignore all of these disks
 # from a RHEL install perspective
 # NOTE: RHEL does not like /dev/sr* in the ignoredisks
 # command so grep that out
-lsblk --scsi | grep -v ^sr | awk '/Virtual Media|Virtual DVD-ROM|Virtual HDD/ { print $1 }' > /ilo-disks.cfg
+lsblk --scsi | grep -v ^sr | awk '/Virtual Media|Virtual DVD-ROM|Virtual HDD|Virtual USB Key/ { print $1 }' > /ilo-disks.cfg
 
 # now determine the 1st drive that will be the default root disk (if no RAID setup)
 # by getting all block devices, remove ilo-disks, sort (alphabetical order), take 1st one on the list
@@ -150,9 +151,8 @@ network --bootproto=dhcp --device={{.HWAddr}} --ipv6=auto --activate
 # Include the /ks-storage.cfg file that we generated in the %pre section
 %include "/ks-storage.cfg"
 
-# the required rootpw option. Lock option means
-# "the root user will not be able to log in from the console."
-rootpw --lock
+# Required: Sets the root password for the system.
+rootpw %ROOTPW%
 
 # node_exporter user
 user --name=node_exporter --shell=/sbin/nologin
