@@ -268,7 +268,7 @@ Command Line Options                | Description
 -i \<rhel-iso-filename\>            | local filename of the standard RHEL .ISO file that was already downloaded. Used as input file.
 -v \<rhel-version-number\>          | a x.y RHEL version number.  Example: -v 7.9
 -o \<rhel-baremetal-iso\>           | local filename of the Bare Metal modified RHEL .ISO file that will be output by the script.  This file should be uploaded to your web server.
--p \<image-url-prefix\>             | the beginning of the image URL (on your web server). Example: -p http://192.168.1.131.
+-p \<image-url-prefix\>             | the beginning of the image URL (on your web server). Example: -p https://<web-server-address>.
 -s \<rhel-baremetal-service-file\>  | local filename of the Bare Metal .YML service file that will be output by the script.  This file should be uploaded to the Bare Metal portal.
 
 > **_NOTE:_**  The users of this script are expected to copy the \<rhel-baremetal-iso\> .ISO file to your web server
