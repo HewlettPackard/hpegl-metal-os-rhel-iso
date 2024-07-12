@@ -32,8 +32,7 @@ This GitHub repository contains the script files, template files, and documentat
 
 Workflow for Building Image:
 
-![image](https://github.com/hpe-hcss/bmaas-byoi-rhel-build/assets/90067804/357d6226-7931-4312-b91c-57c9f3f636a7)
-
+![image](https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso/assets/90067804/e2a198c4-96f1-4c1c-8fa0-4ac8c730857e)
 
 Prerequisites:
 ```
@@ -82,9 +81,9 @@ Example test result for reference:
 | |
 | | To use this new Bare Metal RHEL service/image in the HPE Bare Metal, take the following steps:
 | | (1) Copy the new .ISO file (RHEL-9.0-BareMetal.iso)
-| |     to your web server (http://10.152.2.125)
+| |     to your web server (https://<web-server-address>)
 | |     such that the file can be downloaded from the following URL:
-| |     http://10.152.2.125/images/RHEL-9.0-BareMetal.iso
+| |     https://<web-server-address>/images/RHEL-9.0-BareMetal.iso
 | | (2) Use the script "glm-test-service-image.sh" to test that the HPE Bare Metal service
 | |     .yml file points to the expected OS image on the web server with the expected OS image
 | |     size and signature.
@@ -139,8 +138,16 @@ The OS image size and signature have been verified
 
 Step 6. Add the Bare Metal service .yml file to the appropriate Bare Metal portal.
 
+To add the Bare Metal service .yml file, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".  
+Select the Dashboard tile "Metal Consumption" and click on the tab "OS/application images".  
+Click on the button "Add OS/application image" to upload this service .yml file.  
+
 Step 7. Create a new Bare Metal host using this OS image service.
 
+To create a new Bare Metal host, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".  
+Select the Dashboard tile "Metal Consumption" and click on the tab "Compute groups". Further, create a host using the following steps:    
+a. First create a Compute Group by clicking the button "Create compute group" and fill in the details.  
+b. Create a Compute Instance by clicking the button "Create compute instance" and fill in the details.
 
 # Building RHEL image
 
@@ -197,6 +204,7 @@ This RHEL recipe has been successfully tested with the following list of RHEL di
 * RHEL 8.6
 * RHEL 8.7
 * RHEL 9.0
+* Oracle Linux 8.6
 * Oracle Linux 9.3
 * Rocky Linux 8.8
 
@@ -262,7 +270,7 @@ Command Line Options                | Description
 -i \<rhel-iso-filename\>            | local filename of the standard RHEL .ISO file that was already downloaded. Used as input file.
 -v \<rhel-version-number\>          | a x.y RHEL version number.  Example: -v 7.9
 -o \<rhel-baremetal-iso\>           | local filename of the Bare Metal modified RHEL .ISO file that will be output by the script.  This file should be uploaded to your web server.
--p \<image-url-prefix\>             | the beginning of the image URL (on your web server). Example: -p http://192.168.1.131.
+-p \<image-url-prefix\>             | the beginning of the image URL (on your web server). Example: -p https://<web-server-address>.
 -s \<rhel-baremetal-service-file\>  | local filename of the Bare Metal .YML service file that will be output by the script.  This file should be uploaded to the Bare Metal portal.
 
 > **_NOTE:_**  The users of this script are expected to copy the \<rhel-baremetal-iso\> .ISO file to your web server
@@ -421,9 +429,9 @@ For example:
 | |
 | | To use this new Bare Metal RHEL service/image in the HPE Bare Metal, take the following steps:
 | | (1) Copy the new .ISO file (RHEL-9.0-BareMetal.iso)
-| |     to your web server (http://10.152.2.125)
+| |     to your web server (https://<web-server-address>)
 | |     such that the file can be downloaded from the following URL:
-| |     http://10.152.2.125/images/RHEL-9.0-BareMetal.iso
+| |     https://<web-server-address>/images/RHEL-9.0-BareMetal.iso
 | | (2) Use the script "glm-test-service-image.sh" to test that the HPE Bare Metal service
 | |     .yml file points the expected OS image on the web server with the expected OS image
 | |     size and signature.
