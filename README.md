@@ -139,7 +139,16 @@ The OS image size and signature have been verified
 
 Step 6. Add the Bare Metal service .yml file to the appropriate Bare Metal portal.
 
+To add the Bare Metal service .yml file, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".  
+Select the Dashboard tile "Metal Consumption" and click on the tab "OS/application images".  
+Click on the button "Add OS/application image" to upload this service .yml file.  
+
 Step 7. Create a new Bare Metal host using this OS image service.
+
+To create a new Bare Metal host, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".  
+Select the Dashboard tile "Metal Consumption" and click on the tab "Compute groups". Further, create a host using the following steps:    
+a. First create a Compute Group by clicking the button "Create compute group" and fill in the details.  
+b. Create a Compute Instance by clicking the button "Create compute instance" and fill in the details.
 
 
 # Building RHEL image
