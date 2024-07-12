@@ -32,8 +32,7 @@ This GitHub repository contains the script files, template files, and documentat
 
 Workflow for Building Image:
 
-![image](https://github.com/hpe-hcss/bmaas-byoi-rhel-build/assets/90067804/357d6226-7931-4312-b91c-57c9f3f636a7)
-
+![image](https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso/assets/90067804/e2a198c4-96f1-4c1c-8fa0-4ac8c730857e)
 
 Prerequisites:
 ```
