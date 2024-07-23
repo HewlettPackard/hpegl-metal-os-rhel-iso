@@ -1,6 +1,6 @@
 <!-- (C) Copyright 2024 Hewlett Packard Enterprise Development LP -->
 
-RHEL Bring Your Own Image (BYOI) for HPE Private Cloud Enterprise - Bare Metal
+RHEL/Oracle Linux Bring Your Own Image (BYOI) for HPE Private Cloud Enterprise - Bare Metal
 =============================
 
 * [Overview](#overview)
@@ -18,7 +18,7 @@ RHEL Bring Your Own Image (BYOI) for HPE Private Cloud Enterprise - Bare Metal
   *   [Triage of image deployment problems](#triage-of-image-deployment-problems)
   *   [RHEL License](#rhel-license)
   *   [Known Observations/Issues](#known-observations-and-issues)
-  *   [RHEL License](#rhel-license)
+  *   [OS License](#os-license)
   *   [Storage Volumes iSCSI and FC](#storage-volumes-iscsi-and-fc)
 
 
@@ -26,20 +26,24 @@ RHEL Bring Your Own Image (BYOI) for HPE Private Cloud Enterprise - Bare Metal
 
 # Overview
 
-This GitHub repository contains the script files, template files, and documentation for creating an RHEL service for HPE Bare Metal from an RHEL install .ISO file.  By building a custom image via this process, you can control the exact version of RHEL that is used and modify how RHEL is installed via a kickstart file.  Once the build is done, you can add your new service to the HPE Bare Metal Portal and deploy a host with that new image.  This RHEL recipe has been shown to work with Red Hat Enterprise Linux, Oracle Linux, and Rocky Linux.
+This GitHub repository contains the script files, template files, and documentation for creating an RHEL service for HPE Bare Metal from an RHEL install .ISO file.  By building a custom image via this process, you can control the exact version of RHEL that is used and modify how RHEL is installed via a kickstart file.  Once the build is done, you can add your new service to the HPE Bare Metal Portal and deploy a host with that new image.
+
+> [!IMPORTANT]  
+> **This RHEL recipe has been shown to work with Red Hat Enterprise Linux (RHEL), Oracle Linux (OL), and Rocky Linux.**
 
 # Example of manual build for reference
 
 Workflow for Building Image:
 
-![image](https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso/assets/90067804/e2a198c4-96f1-4c1c-8fa0-4ac8c730857e)
+![image](https://github.com/hpe-hcss/bmaas-byoi-rhel-build/assets/90067804/357d6226-7931-4312-b91c-57c9f3f636a7)
+
 
 Prerequisites:
 ```
 1. You will need a Web Server with HTTPS support for storage of the HPE Base Metal images.  The Web Server is anything that:
    A. You have the ability to upload large .ISO image to and
    B. The Web Server must be on a network that will be reachable from the HPE On-Premises Controller.  When an OS service/image is used to create an HPE Bare Metal Host the OS images will be downloaded via the secure URL in the service file.
-   NOTE: For this manual build example, a local Web Server "https://<web-server-address>" is used for OS image storage.  For this example, we are assuming that the HPE Bare Metal OS images will be kept in: https://<web-server-address>/<.iso>.
+   NOTE: For this manual build example, a local Web Server "https://<web-server-address>" is used for OS image storage.  For this example, we are assuming that the HPE Bare Metal OS images will be kept in: https://<web-server-address>/images/<.iso>.
 2. Linux machine for building OS image
    A. Ubuntu 20.04.6 LTS
    B. Install supporting tools (git, xorriso, and isomd5sum)
@@ -63,7 +67,7 @@ Example:
 ```
 ./glm-build-image-and-service.sh \
   -v 9.0 \
-  -p https://<web-server-address> \
+  -p https://10.152.2.125 \
   -r qPassw0rd \
   -i RHEL-9.0.0-20220810.0-x86_64-HPE.iso \
   -o RHEL-9.0-BareMetal.iso \
@@ -81,9 +85,9 @@ Example test result for reference:
 | |
 | | To use this new Bare Metal RHEL service/image in the HPE Bare Metal, take the following steps:
 | | (1) Copy the new .ISO file (RHEL-9.0-BareMetal.iso)
-| |     to your web server (https://<web-server-address>)
+| |     to your web server (https://10.152.2.125)
 | |     such that the file can be downloaded from the following URL:
-| |     https://<web-server-address>/RHEL-9.0-BareMetal.iso
+| |     https://10.152.2.125/images/RHEL-9.0-BareMetal.iso
 | | (2) Use the script "glm-test-service-image.sh" to test that the HPE Bare Metal service
 | |     .yml file points to the expected OS image on the web server with the expected OS image
 | |     size and signature.
@@ -100,7 +104,8 @@ Example test result for reference:
 Step 4. Copy the output Bare Metal image .ISO to the Web Server.
 
 Step 5. Run the script `glm-test-service-image.sh`, which will verify that the OS image referred to in a corresponding Bare Metal OS service .yml is correct:
-> **_NOTE:_** This script will verify that it can download the OS image and check its length (in bytes) and signature.
+> [!NOTE]  
+> This script will verify that it can download the OS image and check its length (in bytes) and signature.
 > The script simulates what HPE On-Premises Controller will do when it tries to download and verify an OS image.
 > If this script fails then the Bare Metal OS service .yml file is most likely broken and will not work if loaded into Bare Metal.
 
@@ -109,19 +114,19 @@ Example:
 ./glm-test-service-image.sh RHEL-9.0-BareMetal.yml
 ```
 
-Test result for reference:
+Test result example for reference:
 
 ```
 $ ./glm-test-service-image.sh RHEL-9.0-BareMetal.yml
 OS image file to be tested:
-  Secure URL: https://<web-server-address>/RHEL-9.0-BareMetal.iso
+  Secure URL: https://<web-server-address>/images/RHEL-9.0-BareMetal.iso
   Display URL: RHEL-9.0.0-20220810.0-x86_64-HPE.iso
   Image size: 8484028416
   Image signature: ca6235cfb2734bdea71fc3794a32f8b3c71bbc019d15e274e271de668ccc86f1
   Signature algorithm: sha256sum
 
-wget -O /tmp/os-image-M9V0GR.img https://<web-server-address>/RHEL-9.0-BareMetal.iso
---2024-03-28 17:26:47--  https://<web-server-address>/RHEL-9.0-BareMetal.iso
+wget -O /tmp/os-image-M9V0GR.img https://10.152.2.125/images/RHEL-9.0-BareMetal.iso
+--2024-03-28 17:26:47--  https://10.152.2.125/images/RHEL-9.0-BareMetal.iso
 Connecting to 10.152.2.125:80... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 8484028416 (7.9G) [application/x-iso9660-image]
@@ -138,16 +143,16 @@ The OS image size and signature have been verified
 
 Step 6. Add the Bare Metal service .yml file to the appropriate Bare Metal portal.
 
-To add the Bare Metal service .yml file, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".  
-Select the Dashboard tile "Metal Consumption" and click on the tab "OS/application images".  
-Click on the button "Add OS/application image" to upload this service .yml file.  
+To add the Bare Metal service .yml file, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".
+Select the Dashboard tile "Metal Consumption" and click on the "OS/application images" tab.
+Click on the button "Add OS/application image" to upload this service .yml file.
 
 Step 7. Create a new Bare Metal host using this OS image service.
 
-To create a new Bare Metal host, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".  
-Select the Dashboard tile "Metal Consumption" and click on the tab "Compute groups". Further, create a host using the following steps:    
-a. First create a Compute Group by clicking the button "Create compute group" and fill in the details.  
-b. Create a Compute Instance by clicking the button "Create compute instance" and fill in the details.
+To create a new Bare Metal host, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".
+Select the Dashboard tile "Metal Consumption" and click on the tab "Compute groups". Further, create a host using the following steps:
+a. First, create a Compute Group by clicking the "Create compute group" button and fill in the details.
+b. Create a Compute Instance by clicking the "Create compute instance" button and fill in the details.
 
 
 # Building RHEL image
@@ -184,7 +189,8 @@ On Ubuntu 20.04 VM, the necessary packages can be installed with:
 sudo apt install git xorriso isomd5sum
 ```
 
-> **_NOTE:_**  You must also have sudo (superuser do) capability so that you can mount the RHEL ISO
+> [!NOTE]  
+> You must also have sudo (superuser do) capability so that you can mount the RHEL ISO
 > and copy the files from it to generate a new RHEL .ISO file for Bare Metal.
 
 The resulting RHEL .ISO image file from the build, needs to be uploaded to a web server that
@@ -213,7 +219,8 @@ This RHEL recipe has been successfully tested with the following list of RHEL di
 * Oracle Linux 9.3
 * Rocky Linux 8.8
 
-> **_NOTE:_**  This recipe should work on other RHEL or RHEL-based distros that support the same kickstart and .ISO construction as the recent version of RHEL.
+> [!NOTE]  
+> This recipe should work on other RHEL or RHEL-based distros that support the same kickstart and .ISO construction as the recent version of RHEL.  
 > **For Secure Boot, the user must have RHEL 9.1 or later.**
 
 ## Building the Bare Metal RHEL image and service
@@ -276,10 +283,11 @@ Command Line Options                | Description
 -i \<rhel-iso-filename\>            | local filename of the standard RHEL .ISO file that was already downloaded. Used as input file.
 -v \<rhel-version-number\>          | a x.y RHEL version number.  Example: -v 7.9
 -o \<rhel-baremetal-iso\>           | local filename of the Bare Metal modified RHEL .ISO file that will be output by the script.  This file should be uploaded to your web server.
--p \<image-url-prefix\>             | the beginning of the image URL (on your web server). Example: -p https://<web-server-address>.
+-p \<image-url-prefix\>             | the beginning of the image URL (on your web server). Example: -p https://10.152.2.125.
 -s \<rhel-baremetal-service-file\>  | local filename of the Bare Metal .YML service file that will be output by the script.  This file should be uploaded to the Bare Metal portal.
 
-> **_NOTE:_**  The users of this script are expected to copy the \<rhel-baremetal-iso\> .ISO file to your web server
+> [!NOTE]  
+> The users of this script are expected to copy the \<rhel-baremetal-iso\> .ISO file to your web server
 > such that the file is available at this constructed URL: \<image-url-prefix\>/\<rhel-baremetal-iso\>.
 > The Bare Metal service .YML will assume that the image file will be available at a URL constructed with \<image-url-prefix\>/\<rhel-baremetal-iso\>.
 
@@ -365,7 +373,7 @@ Example:
     -c linux \
     -f RHEL \
     -v 9.0-20240328-BYOI \
-    -u https://<web-server-address>/RHEL-9.0-BareMetal.iso \
+    -u https://10.152.2.125/images/RHEL-9.0-BareMetal.iso \
     -d RHEL-9.0.0-20220810.0-x86_64-HPE.iso \
     -i RHEL-9.0-BareMetal.iso \
     -t glm-kickstart.cfg.template \
@@ -423,6 +431,7 @@ Many additional changes to either of the kickstart files are possible to customi
 ## Adding RHEL service to Bare Metal portal
 
 When the build script completes successfully, you will find the following instructions to add this image to your HPE Bare Metal portal.
+
 For example:
 
 ```
@@ -435,9 +444,9 @@ For example:
 | |
 | | To use this new Bare Metal RHEL service/image in the HPE Bare Metal, take the following steps:
 | | (1) Copy the new .ISO file (RHEL-9.0-BareMetal.iso)
-| |     to your web server (https://<web-server-address>)
+| |     to your web server (https://10.152.2.125)
 | |     such that the file can be downloaded from the following URL:
-| |     https://<web-server-address>/RHEL-9.0-BareMetal.iso
+| |     https://10.152.2.125/images/RHEL-9.0-BareMetal.iso
 | | (2) Use the script "glm-test-service-image.sh" to test that the HPE Bare Metal service
 | |     .yml file points the expected OS image on the web server with the expected OS image
 | |     size and signature.
@@ -467,10 +476,10 @@ Here are some points to note:
 
 ## Known Observations and Issues
 
-<1> For Oracle Linux
-About Issue: Services (sshd/cloud-init) found inactive. This results into an error `sshd: no hostkeys available -- exiting` and User can not SSH to the host.
-About Fix: Reboot the Host once. Reboot will bring up the host with active sshd services and required host keys.
-Reference file: '/etc/systemd/system/sshd-keygen@.service.d/disable-sshd-keygen-if-cloud-init-active.conf'
+<1> For Oracle Linux  
+**About Issue:** Services (sshd/cloud-init) found inactive. This results into an error `sshd: no hostkeys available -- exiting` and User can not SSH to the host.  
+**About Fix:** Reboot the Host once. Reboot will bring up the host with active sshd services and required host keys.  
+**Reference file:** '/etc/systemd/system/sshd-keygen@.service.d/disable-sshd-keygen-if-cloud-init-active.conf'  
 ```
 # In some cloud-init enabled images the sshd-keygen template service may race with cloud-init
 # during boot causing issues with host key generation.  This drop-in config adds a condition
@@ -480,7 +489,7 @@ Reference file: '/etc/systemd/system/sshd-keygen@.service.d/disable-sshd-keygen-
 ConditionPathExists=!/run/systemd/generator.early/multi-user.target.wants/cloud-init.target
 ```
 
-## RHEL License
+## OS License
 
 RHEL is a licensed software and users need to have a valid license key from RedHat to use RHEL.
 This install service does nothing to set up an RHEL license key in any way.
