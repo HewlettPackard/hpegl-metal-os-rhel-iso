@@ -37,7 +37,6 @@ Workflow for Building Image:
 
 ![image](https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso/assets/90067804/e2a198c4-96f1-4c1c-8fa0-4ac8c730857e)
 
-
 Prerequisites:
 ```
 1. You will need a Web Server with HTTPS support for storage of the HPE Base Metal images.  The Web Server is anything that:
