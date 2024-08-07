@@ -134,7 +134,9 @@ network:
       -  {{.Name}}
       {{- end}}
       params:
-          bond-mode: 2
+          # bonding mode = mode 5 (balance-tlb)
+          # Reference: https://www.ibm.com/docs/en/linux-on-systems?topic=recommendations-bonding-modes
+          bond-mode: 5
           bond-miimon: 100
           bond-xmit_hash_policy: 2
       {{- $vlan_parent = .Name}}
