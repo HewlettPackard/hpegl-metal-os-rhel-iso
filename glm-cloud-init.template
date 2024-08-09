@@ -134,7 +134,9 @@ network:
       -  {{.Name}}
       {{- end}}
       params:
-          bond-mode: 2
+          # Reference: https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/configuring_and_managing_networking/configuring-network-bonding_configuring-and-managing-networking#configuring-network-bonding_configuring-and-managing-networking
+          # set bonding mode = mode 5 (balance-tlb)
+          bond_mode: balance-tlb
           bond-miimon: 100
           bond-xmit_hash_policy: 2
       {{- $vlan_parent = .Name}}
