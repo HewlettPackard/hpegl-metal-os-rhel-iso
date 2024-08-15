@@ -16,8 +16,8 @@ RHEL/Oracle Linux Bring Your Own Image (BYOI) for HPE Private Cloud Enterprise -
   *   [Adding RHEL service to Bare Metal portal](#adding-rhel-service-to-bare-metal-portal)
   *   [Creating an RHEL Host with RHEL Service](#creating-an-rhel-host-with-rhel-service)
   *   [Triage of image deployment problems](#triage-of-image-deployment-problems)
-  *   [RHEL License](#rhel-license)
   *   [Known Observations/Issues](#known-observations-and-issues)
+  *   [Troubleshooting](#troubleshooting)
   *   [OS License](#os-license)
   *   [Storage Volumes iSCSI and FC](#storage-volumes-iscsi-and-fc)
 
@@ -281,6 +281,7 @@ Command Line Options                | Description
 ------------------------------------| -----------
 -i \<rhel-iso-filename\>            | local filename of the standard RHEL .ISO file that was already downloaded. Used as input file.
 -v \<rhel-version-number\>          | a x.y RHEL version number.  Example: -v 7.9
+-r \<rhel-rootpw\>                  | clear-text password for the root user. <br> **_NOTE:_**  <br> 1. Later, this clear-text password is encrypted and the Service file (.yml) shows an encrypted password in the kick-start `/KS.cfg` file. <br> 2. This clear-test password will be visible in the build machine's command history. You may identify the command number you want to remove and then use `history -d` followed by the command number.
 -o \<rhel-baremetal-iso\>           | local filename of the Bare Metal modified RHEL .ISO file that will be output by the script.  This file should be uploaded to your web server.
 -p \<image-url-prefix\>             | the beginning of the image URL (on your web server). Example: -p https://10.152.2.125.
 -s \<rhel-baremetal-service-file\>  | local filename of the Bare Metal .YML service file that will be output by the script.  This file should be uploaded to the Bare Metal portal.
@@ -487,6 +488,33 @@ Here are some points to note:
 [Unit]
 ConditionPathExists=!/run/systemd/generator.early/multi-user.target.wants/cloud-init.target
 ```
+
+## Troubleshooting
+
+This section covers common problems and solutions for RHEL/Oracle Linux issues.  
+<1> How to Login using Serial Console  
+Linux kernels can output information including the login prompt to serial ports. Users can open the serial console window to log in to the host.  
+Example for reference:   
+```
+Session established.
+Connecting...
+Connected.
+     <<Press Enter to have Login Prompt>>
+Oracle Linux Server 8.9
+Kernel 5.15.0-200.131.27.el8uek.x86_64 on an x86_64
+                                                                                                                                            
+nb-ol8 login: root
+Password:
+Last login: Mon Aug 12 23:40:51 on ttyS1
+[root@nb-ol8 ~]#
+```
+<2> The serial console can freeze and stop taking input.  
+The user needs to access the host via SSH and run the following steps to resume the console access:  
+A. Verify the following error footprints in the `/var/log/messages` log file: `getty@ttyS1.service: Failed with result 'start-limit-hit'.`  
+B. Restart the service using the command: `systemctl restart  getty@ttyS1.service`  
+C. Verify the `active (running)` status of this systemd service `getty@ttyS1.service`  
+In case the user can't log in via SSH, please do a graceful host reboot.  
+Note: The user may refer to a relevant issue on RedHat Customer Portal: https://access.redhat.com/solutions/7004165 
 
 ## OS License
 

@@ -69,7 +69,7 @@ do
         # required parameters
         i) RHEL_ISO_FILENAME=$OPTARG ;;
         v) OS_VER=$OPTARG ;;
-        r) RHEL_ROOTPW=$OPTARG ;;
+        r) RHEL_ROOTPW=`openssl passwd -6 -salt xyz $OPTARG` ;;
         o) GLM_CUSTOM_RHEL_ISO=$OPTARG ;;
         p) IMAGE_URL_PREFIX=$OPTARG ;;
         s) GLM_YML_SERVICE_FILE=$OPTARG ;;
@@ -116,8 +116,8 @@ fi
 GLM_YML_SERVICE_TEMPLATE=$(mktemp /tmp/glm-service.cfg.XXXXXXXXX)
 sed -e "s/%OS_VERSION%/$OS_VER/g" glm-service.yml.template > $GLM_YML_SERVICE_TEMPLATE
 
-# set the root password in the KS configuration file
-sed -i "s/%ROOTPW%/$RHEL_ROOTPW/g" glm-kickstart.cfg.template
+# set the user provided root password in the KS configuration file
+sed -i "s'%ROOTPW%'$RHEL_ROOTPW'g" glm-kickstart.cfg.template
 
 # extract the Service Flavor from the GLM_CUSTOM_RHEL_ISO
 # such that GLM_CUSTOM_RHEL_ISO contains the word RHEL|Oracle|Rocky
@@ -149,7 +149,7 @@ echo $GEN_SERVICE
 $GEN_SERVICE
 
 # unset the root password in the KS configuration file
-sed -i '/rootpw/c\rootpw %ROOTPW%' glm-kickstart.cfg.template
+sed -i '/rootpw/c\rootpw %ROOTPW% --iscrypted' glm-kickstart.cfg.template
 
 # print out instructions for using this image & service
 cat << EOF

@@ -151,8 +151,9 @@ network --bootproto=dhcp --device={{.HWAddr}} --ipv6=auto --activate
 # Include the /ks-storage.cfg file that we generated in the %pre section
 %include "/ks-storage.cfg"
 
-# Required: Sets the root password for the system.
-rootpw %ROOTPW%
+# Required field:
+# Sets an encrypted root password for the system.
+rootpw %ROOTPW% --iscrypted
 
 # node_exporter user
 user --name=node_exporter --shell=/sbin/nologin
