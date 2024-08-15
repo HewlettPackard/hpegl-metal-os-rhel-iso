@@ -18,6 +18,10 @@ manage_etc_hosts: true
 # ----------------------------------------------------
 users:
   - name: root
+    # Reference: https://cloudinit.readthedocs.io/en/latest/reference/examples.html
+    #   lock_passwd: Defaults to true. Lock the password to disable password login.
+    #   Set it to false to unlock the password (for root login at the serial console).
+    lock_passwd: false
 {{- if .SSHKeys }}
     ssh_authorized_keys:
   {{- range $key := .SSHKeys}}
