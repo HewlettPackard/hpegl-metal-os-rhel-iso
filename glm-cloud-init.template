@@ -231,8 +231,10 @@ runcmd:
 {{- if .VolumeAttachments}}
   # iSCSI Volume attachments
   # ----------------------------------------------------
-  # This requires host to create with a Volume attached and will setup multipathd to create dm device for it
-  # Once host is up, Metal can add additional volume attachments and user will need to do "iscsiadm -m session --rescan"  # and new dm device will be created.
+  # This requires a host to create with a volume attached and will set up
+  # multipathd to create a dm device for it. Once the host is up, Metal can
+  # add additional volume attachments and the user will need to do
+  # "iscsiadm -m session --rescan" and a new dm device will be created.
   {{- range $da := .ISCSIDiscoveryAddressesV3}}
   - iscsiadm --mode discovery -t sendtargets  -p "{{$da }}"
   {{- end}}
@@ -240,3 +242,10 @@ runcmd:
   - iscsiadm --mode node --login
   {{- end}}
 {{- end}}
+
+power_state:
+  # In some cloud-init-enabled images, a few services may race with cloud-init
+  # during boot, causing issues with initial modules. To avoid such issues,
+  # reboot the host at the end of a host deployment.
+  mode: reboot
+  message: Host is rebooting
