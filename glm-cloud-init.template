@@ -60,12 +60,17 @@ users:
   {{- end}}
 {{- end}}
 
+# cloud-init module "write_file" is to create a new file or 
+#   overwrite an existing file during initialization.
+# ----------------------------------------------------
 write_files:
+    # System Configuration file for node exporter
   - path: /etc/sysconfig/node_exporter
     owner: node_exporter
     permissions: '0644'
     content: |
         ARGS="--web.listen-address=\":45678\""
+    # Systemd unit files created by systemctl enable
   - path: /etc/systemd/system/node_exporter.service
     owner: root
     permissions: '0644'
@@ -79,14 +84,16 @@ write_files:
         [Install]
         WantedBy=multi-user.target
 {{- /* verify the rest of write_files: is needed */}}
-  {{- if  .InitiatorName}}
+{{- if  .InitiatorName}}
+    # Set initiator name
   - path: /etc/iscsi/initiatorname.iscsi
     owner: root
     permissions: '0644'
     content: |
       InitiatorName={{.InitiatorName}}
-  {{- end}}
-  {{- if  .CHAPSecret}}
+{{- end}}
+{{- if  .CHAPSecret}}
+    # Set iSCSI target with CHAP authorization
   - path: /etc/iscsi/iscsid.conf
     owner: root
     permissions: '0644'
@@ -95,8 +102,9 @@ write_files:
       node.session.auth.username = {{.CHAPUser}}
       node.session.auth.password = {{.CHAPSecret}}
       node.startup = automatic
-  {{- end}}
-  {{- if $proxy }}
+{{- end}}
+{{- if $proxy }}
+    # Set proxy settings
   - path: /etc/environment
     owner: root
     permissions: '0644'
@@ -107,11 +115,64 @@ write_files:
         HTTP_PROXY={{$proxy}}
         HTTPS_PROXY={{$proxy}}
         NO_PROXY={{$no_proxy}}
-  {{- end}}
+{{- end}}
+    # Writing script for node exporter service; executes under runcmd
+  - path: /var/lib/cloud/instance/scripts/glm-node-exporter.sh
+    owner: root
+    permissions: '0775'
+    content: |
+      #!/bin/bash
+      curl_cmd="curl --silent --location"
+    {{- if $proxy }}
+      curl_cmd+=" --proxy {{$proxy}}"
+    {{- end }}
+      echo "$(date '+%Y%m%d-%H:%M:%S') curl_cmd=${curl_cmd}" > /var/log/glm-node-exporter.log
+      for try in {1..3} ; do
+        download_url=$(${curl_cmd} \
+        https://api.github.com/repos/prometheus/node_exporter/releases/latest | grep "browser_download_url.*linux-amd64.tar.gz" | cut -d ':' -f2,3 | tr -d \")
+        echo "$(date '+%Y%m%d-%H:%M:%S') download_url=${download_url}" >> /var/log/glm-node-exporter.log
+        ${curl_cmd} ${download_url} > node_exporter.tar.gz
+        echo "$(date '+%Y%m%d-%H:%M:%S') PNE Source- $(ls -lrt node_exporter.tar.gz)" >> /var/log/glm-node-exporter.log
+        tar zxf node_exporter.tar.gz
+        if [ -f node_exporter-*/node_exporter ]; then
+          mv node_exporter-*/node_exporter /usr/bin
+          rm -rf node_exporter*
+          chown node_exporter:node_exporter /usr/bin/node_exporter
+          chcon -t bin_t /usr/bin/node_exporter
+          systemctl daemon-reload
+          systemctl enable node_exporter
+          systemctl start node_exporterbreak
+          break
+        fi
+        echo "$(date '+%Y%m%d-%H:%M:%S') ERROR failed to download the node exporter source file, attempt $try of 3" >> /var/log/glm-node-exporter.log
+      done
+    # Writing script for iscsid service; executes under runcmd
+  - path: /var/lib/cloud/instance/scripts/glm-iscsid.sh
+    owner: root
+    permissions: '0775'
+    content: |
+      #!/bin/bash
+      systemctl enable iscsid
+      systemctl start iscsid
+      echo $(date '+%Y%m%d-%H:%M:%S') $(systemctl status iscsid | grep -i pid) > /var/log/glm-iscsid.log
+    {{- if .VolumeAttachments}}
+      # iSCSI Volume attachments
+      # ----------------------------------------------------
+      # This requires host to create with a Volume attached and will
+      # setup multipathd to create dm device for it. Once host is up,
+      # Metal can add additional volume attachments and user will need
+      # to do "iscsiadm -m session --rescan" and new dm device will be created.
+    {{- range $da := .ISCSIDiscoveryAddressesV3}}
+      iscsiadm --mode discovery -t sendtargets  -p "{{$da }}"
+    {{- end}}
+    {{- if .ISCSIDiscoveryAddressesV3}}
+      iscsiadm --mode node --login
+    {{- end}}
+    {{- end}}
 
-{{ if .Connections}}
 # network connections
 # ----------------------------------------------------
+{{ if .Connections}}
 network:
   version: 1
   config:
@@ -195,10 +256,9 @@ network:
   {{- end}}  {{/* range .Connections  */}}
 {{- end}}    {{/* end if .Connections */}}
 
-{{- if $ntp}}
-
 # NTP server information
 # ----------------------------------------------------
+{{- if $ntp}}
 ntp:
   enabled: true
   servers:
@@ -207,42 +267,24 @@ ntp:
   {{- end}}
 {{- end}}
 
+# cloud-init module "runcmd" is a configuration option that allows users to run commands during boot.
+#   Example: installing software or configuring services.
+#   default: none
+#   runcmd only runs during the first boot
+#   Note: Source path of all script files: "/var/lib/cloud/instance/scripts/<script_files>"
+# ----------------------------------------------------
 runcmd:
-  - |
-    curl_cmd="curl --silent --location \
-{{- if $proxy }}
-    --proxy {{$proxy}} \
-{{- end }}
-    "
-    download_url=`${curl_cmd} \
-    https://api.github.com/repos/prometheus/node_exporter/releases/latest | grep browser_download_url.*linux-amd64.tar.gz | cut -d : -f 2,3 | tr -d \"`
-    ${curl_cmd} \
-    ${download_url} > node_exporter.tar.gz
-  - tar zxf node_exporter.tar.gz
-  - mv node_exporter-*/node_exporter /usr/bin
-  - rm -rf node_exporter*
-  - chown node_exporter:node_exporter /usr/bin/node_exporter
-  - chcon -t bin_t /usr/bin/node_exporter
-  - systemctl daemon-reload
-  - systemctl enable node_exporter
-  - systemctl start node_exporter
-  - systemctl enable iscsid
-  - systemctl start iscsid
-{{- if .VolumeAttachments}}
-  # iSCSI Volume attachments
-  # ----------------------------------------------------
-  # This requires a host to create with a volume attached and will set up
-  # multipathd to create a dm device for it. Once the host is up, Metal can
-  # add additional volume attachments and the user will need to do
-  # "iscsiadm -m session --rescan" and a new dm device will be created.
-  {{- range $da := .ISCSIDiscoveryAddressesV3}}
-  - iscsiadm --mode discovery -t sendtargets  -p "{{$da }}"
-  {{- end}}
-  {{- if .ISCSIDiscoveryAddressesV3}}
-  - iscsiadm --mode node --login
-  {{- end}}
-{{- end}}
+  # Required: write_files
+  - if [ ! -f /var/lib/cloud/instance/scripts/glm-node-exporter.sh ] || [ ! -f /var/lib/cloud/instance/scripts/glm-iscsid.sh ]; then
+      /usr/bin/cloud-init single -n write_files; fi
+  # Script for node exporter service
+  - /var/lib/cloud/instance/scripts/glm-node-exporter.sh
+  # Script for iscsid service
+  - /var/lib/cloud/instance/scripts/glm-iscsid.sh
 
+# cloud-init module "power_state" handles shutdown/reboot
+#   after all config modules have been run.
+# ----------------------------------------------------
 power_state:
   # In some cloud-init-enabled images, a few services may race with cloud-init
   # during boot, causing issues with initial modules. To avoid such issues,
