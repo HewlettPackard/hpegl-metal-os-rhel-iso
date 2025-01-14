@@ -50,7 +50,7 @@ Linux            | Rocky Linux       | 8.8, 9.0
 
 Workflow for Building Image:
 
-![image](https://github.com/user-attachments/assets/ced85a55-118b-42b2-8d24-2a6e0de3ed3f)
+![image](https://github.com/user-attachments/assets/e6c66b43-2776-4b22-9795-0fe2e4ed5dfc)
 
 
 **Prerequisites:**
