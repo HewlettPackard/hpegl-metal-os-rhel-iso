@@ -141,7 +141,7 @@ write_files:
           chcon -t bin_t /usr/bin/node_exporter
           systemctl daemon-reload
           systemctl enable node_exporter
-          systemctl start node_exporterbreak
+          systemctl start node_exporter
           break
         fi
         echo "$(date '+%Y%m%d-%H:%M:%S') ERROR failed to download the node exporter source file, attempt $try of 3" >> /var/log/glm-node-exporter.log

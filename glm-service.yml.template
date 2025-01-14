@@ -1,24 +1,28 @@
-# (C) Copyright 2021-2022, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022, 2024-2025 Hewlett Packard Enterprise Development LP
 ---
 name: "BYOI %SVC_FLAVOR% Linux %OS_VERSION% %YYYYMMDD%"
 type: deploy
 svc_category: %SVC_CATEGORY%
 svc_flavor: %SVC_FLAVOR%
 svc_ver: "%SVC_VER%"
-description: "HPE Bare Metal BYOI %SVC_FLAVOR% Linux %OS_VERSION%. Telemetry (Prometheus) enabled. No Switch LAG. Bonding mode is mode 5 (balance-tlb). \
-This service is NOT supported on Gen 9 servers (and trying it on a Gen 9 server will generate an error). \
-This is a .ISO install Service (that installs via Virtual Media) built on %YYYYMMDD%"
+description: "HPE Bare Metal BYOI %SVC_FLAVOR% Linux %OS_VERSION%. Telemetry (Prometheus) enabled. No Switch LAG. \
+  Bonding mode is mode 5 (balance-tlb). \
+  This service is NOT supported on Gen 9 servers (and trying it on a Gen 9 server will generate an error). \
+  This is a .ISO install Service (that installs via Virtual Media) built on %YYYYMMDD%"
 timeout: 7000
 approach: vmedia
 assumed_boot_method: na
+origin: Custom
+no_switch_lag: true
 files:
   - path: "rhel.iso"
     file_size: %SIZE%
     display_url: "%DISPLAY_URL%"
     secure_url: "%SECURE_URL%"
-    download_timeout: 5000
+    download_timeout: 6000
     signature: "%SUM%"
     algorithm: sha256sum
+    skip_ssl_verify: false
 info:
   - encoding: "base64"
     templating: "go-text-template"
@@ -40,8 +44,6 @@ info:
     contents: "{{.UserData}}"
 project_use: true
 hoster_use: true
-no_switch_lag: true
-origin: Custom
 classifiers:
   - name: Not supported on Gen9
     rules:

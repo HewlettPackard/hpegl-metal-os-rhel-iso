@@ -226,7 +226,7 @@ cat << EOF
 | |     from the following URL: $IMAGE_URL_PREFIX/$GLM_CUSTOM_RHEL_ISO
 `if [ "${SKIP_TEST}" == "true" ]; then echo "${NOTE}"; echo ; else echo "| |"; fi`
 | | (2) Add the Bare Metal Service file ($GLM_YML_SERVICE_FILE) to the HPE Bare Metal Portal
-| |     (https://client.greenlake.hpe-gl-intg.com/). To add the HPE Metal Service file,
+| |     (https://client.greenlake.hpe.com/). To add the HPE Metal Service file,
 | |     sign in to the Bare Metal Portal and select the Tenant by clicking "Go to tenant".
 | |     Select the Dashboard tile "Metal Consumption" and click on the Tab "OS/application images".
 | |     Click on the button "Add OS/application image" to Upload the OS/application YML file.
