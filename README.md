@@ -1,11 +1,11 @@
-<!-- (C) Copyright 2024 Hewlett Packard Enterprise Development LP -->
+<!-- (C) Copyright 2024-2025 Hewlett Packard Enterprise Development LP -->
 
-RHEL/Oracle/Rocky Linux Bring Your Own Image (BYOI) for HPE Private Cloud Enterprise - Bare Metal
+RHEL/Oracle Linux/Rocky Linux Bring Your Own Image (BYOI) for HPE Private Cloud Enterprise - Bare Metal
 =============================
 
 * [Overview](#overview)
-* [Example of manual build for reference](#example-of-manual-build-for-reference)
-* [Building RHEL image](#building-rhel-image)
+* [Quick Guide for Build Process](#quick-guide-for-build-process)
+* [Detailed Version of Build Process](#detailed-version-of-build-process)
   *   [Setup Linux system for imaging build](#setup-linux-system-for-imaging-build)
   *   [Downloading recipe repo from GitHub](#downloading-recipe-repo-from-github)
   *   [Downloading RHEL ISO file](#downloading-rhel-iso-file)
@@ -26,36 +26,52 @@ RHEL/Oracle/Rocky Linux Bring Your Own Image (BYOI) for HPE Private Cloud Enterp
 
 # Overview
 
-This GitHub repository contains the script files, template files, and documentation for creating an RHEL service for HPE Bare Metal from an RHEL install .ISO file.  By building a custom image via this process, you can control the exact version of RHEL that is used and modify how RHEL is installed via a kickstart file.  Once the build is done, you can add your new service to the HPE Bare Metal Portal and deploy a host with that new image.
+This GitHub repository provides the scripts, templates, and documentation needed to create a Red Hat Enterprise Linux (RHEL) service for  
+HPE Private Cloud Enterprise (PCE) Bare Metal (BM) using a RHEL installation .ISO file. By following this process to build a custom image,  
+you gain full control over the specific version of RHEL used and can customize the installation process through a kickstart file.  
+After creating the image, you can seamlessly add the new service to the HPE Bare Metal Portal (https://client.greenlake.hpe.com/) and  
+deploy hosts using this tailored image. This offers a streamlined, flexible solution for your enterprise infrastructure needs.
+
+# Supported HPE PCE Bare Metal Operating Systems
 
 > [!IMPORTANT]  
-> **This RHEL recipe has been shown to work with Red Hat Enterprise Linux (RHEL), Oracle Linux (OL), and Rocky Linux.**
+> **This BYOI RHEL recipe has been shown to work with RHEL, Oracle Linux, and Rocky Linux.**
 
-# Example of manual build for reference
+**GitHub Public Repository**: https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso
+
+Service Category | Service Flavor    | Service Version 
+---------------- | ----------------- | --------------------------------------------
+Linux            | RHEL              | 8.6, 8.7, 8.10, 9.0, 9.1, 9.2, 9.4, 9.5
+Linux            | Oracle Linux (OL) | 8.6, 8.9, 9.3, 9.4
+Linux            | Rocky Linux       | 8.8, 9.0
+
+
+# Quick Guide for Build Process
 
 Workflow for Building Image:
 
-![image](https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso/assets/90067804/e2a198c4-96f1-4c1c-8fa0-4ac8c730857e)
+![image](https://github.com/user-attachments/assets/e6c66b43-2776-4b22-9795-0fe2e4ed5dfc)
 
 
 **Prerequisites:**
 ```
-1. You will need a Web Server with HTTPS support for storage of the HPE Base Metal images.
+This setup ensures a reliable and secure process for managing and deploying OS images in your HPE Bare Metal environment.
+1. You will need a web server with HTTPS support to store the HPE Base Metal images.
 2. The Web Server is anything that:
-    A. you have the ability to upload large OS image (.iso) to, and
+    A. you can upload large OS image (.iso) to, and
     B. is on a network that will be reachable from the HPE On-Premises Controller.
        When an OS image service (.yml) is used to create an HPE Bare Metal Host, the HPE Bare Metal
        OS image (.iso) will be downloaded via the `secure_url` mentioned in the service file (.yml).
 3. IMPORTANT:
    The test `glm-test-service-image.sh` script is to verify the HPE Bare Metal OS image (.iso).
    To run this test, edit the file `./glm-build-image-and-service.sh` to set the required
-   Web Server-related parameters, listed below:
+   Web Server-related parameters are listed below:
       +----------------------------------------------------------------------------
       | +--------------------------------------------------------------------------
       | | File `./glm-build-image-and-service.sh`
       | |   <1> WEB_SERVER_IP: IP address of web server to transfer ISO to (via SSH)
       | |       Example: WEB_SERVER_IP="10.152.3.96"
-      | |   <2> REMOTE_PATH:   Path on web server to copy files to
+      | |   <2> REMOTE_PATH:   Path on a web server to copy files to
       | |       Example: REMOTE_PATH="/var/www/images/"
       | |   <3> SSH_USER:      Username for SSH transfer
       | |       Example: SSH_USER_NAME="root"
@@ -79,37 +95,40 @@ A. Clone the GitHub Repo `hpegl-metal-os-rhel-iso`
 ```
 git clone https://github.com/HewlettPackard/hpegl-metal-os-rhel-iso.git
 ```
-B. Change the directory to `hpegl-metal-os-rhel-iso`
+B. Change the Directory to the Cloned Repository and Create a Temporary Folder to Download ISO Image
+```
+cd hpegl-metal-os-rhel-iso
+mkdir images
+```
 
-Step 2. Download the RHEL .ISO image to your local build environment via what ever method you prefer (Web Browser, etc)
-
-For example, we will assume that you have downloaded RHEL-9.0.0-20220810.0-x86_64-HPE.iso into the local directory.
+Step 2. Download the RHEL .ISO image to your local build environment via whatever method you prefer (Web Browser, etc)
+For example, we will assume that you have downloaded the RHEL .ISO image into the local directory (images/RHEL-9.0.0-20220810.0-x86_64-dvd1.iso).
 
 Step 3. Run the script [glm-build-image-and-service.sh](glm-build-image-and-service.sh) to generate an output Bare Metal image .ISO as well as Bare Metal Service .yml:
 
-Example: Run the build including artifact verification
+Example for running the build including artifact verification:
 ```
 ./glm-build-image-and-service.sh \
-  -v 9.0 \
-  -p https://10.152.3.96 \
-  -r qPassw0rd \
-  -i RHEL-9.0.0-20220810.0-x86_64-HPE.iso \
-  -o RHEL-9.0-BareMetal.iso \
-  -s RHEL-9.0-BareMetal.yml
+ -i images/RHEL-9.0.0-20220810.0-x86_64-dvd1.iso \
+ -v 9.0 \
+ -r qPassw0rd \
+ -p https://10.152.3.96 \
+ -o images/RHEL-9.0-BareMetal.iso \
+ -s images/RHEL-9.0-BareMetal.yml
 ```
-Example: Run the build excluding artifact verification
+Example for running the build excluding artifact verification:
 ```
 ./glm-build-image-and-service.sh \
-  -v 9.0 \
-  -p https://10.152.3.96 \
-  -r qPassw0rd \
-  -i RHEL-9.0.0-20220810.0-x86_64-HPE.iso \
-  -o RHEL-9.0-BareMetal.iso \
-  -s RHEL-9.0-BareMetal.yml \
-  -x true
+ -i images/RHEL-9.0.0-20220810.0-x86_64-dvd1.iso \
+ -v 9.0 \
+ -r qPassw0rd \
+ -p https://10.152.3.96 \
+ -o images/RHEL-9.0-BareMetal.iso \
+ -s images/RHEL-9.0-BareMetal.yml \
+ -x true
 ```
 
-Example test result for reference:
+Example build result for reference:
 ```
 +------------------------------------------------------------------------------------------
 | +----------------------------------------------------------------------------------------
@@ -120,36 +139,49 @@ Example test result for reference:
 | |
 | | To use this new Bare Metal RHEL service/image in the HPE Bare Metal, take the following steps:
 | | (1) Copy the new .ISO file (RHEL-9.0-BareMetal.iso)
-| |     to your web server (https://10.152.3.96)
-| |     such that the file can be downloaded from the following URL:
-| |     https://10.152.3.96/images/RHEL-9.0-BareMetal.iso
+| |     to your web server (https://10.152.3.96) such that the file can be downloaded
+| |     from the following URL: https://10.152.3.96/images/RHEL-9.0-BareMetal.iso
+| |
 | | (2) Add the Bare Metal Service file (RHEL-9.0-BareMetal.yml) to the HPE Bare Metal Portal
-| |     (https://client.greenlake.hpe-gl-intg.com/). To add the HPE Bare Metal Service file,
+| |     (https://client.greenlake.hpe.com/). To add the HPE Bare Metal Service file,
 | |     sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".
 | |     Select the Dashboard tile "Metal Consumption" and click on the Tab "OS/application images".
 | |     Click on the button "Add OS/application image" to Upload the OS/application YML file.
+| |
 | | (3) Create a Bare Metal host using this OS image service.
 | +----------------------------------------------------------------------------------------
 +------------------------------------------------------------------------------------------
 ```
 
-Step 4. Copy the output Bare Metal image .ISO to the Web Server.
+Step 4: Upload the Output Bare Metal Image (.ISO) to the Web Server
+- Copy the generated Bare Metal image (.ISO) to the designated Web Server.
 
-Step 5. Add the Bare Metal service .yml file to the appropriate Bare Metal portal.
+Step 5: Add the Bare Metal Service .yml File to the Portal
+To upload the Bare Metal service .yml file, follow these steps:
+- Sign in to the HPE Bare Metal Portal
+  - Log in using your credentials.
+- Select Your Tenant
+  - Click "Go to tenant" to choose the appropriate tenant.
+- Access the Metal Consumption Dashboard
+  - Click on the "Metal Consumption" tile on the dashboard.
+- Navigate to the OS/Application Images Tab
+  - Click on the "OS/application images" tab.
+- Upload the Service .yml File
+  - Click the "Add OS/application image" button to upload the service .yml file.
 
-To add the Bare Metal service .yml file, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".
-Select the Dashboard tile "Metal Consumption" and click on the "OS/application images" tab.
-Click on the button "Add OS/application image" to upload this service .yml file.
+Step 6: Create a New Bare Metal Host Using the OS Image Service
+To create a new Bare Metal host, follow these steps:
+- Sign in to the HPE Bare Metal Portal
+  - Log in to the portal and click "Go to tenant" to select the appropriate tenant.
+- Navigate to the Compute Groups Tab
+  - On the dashboard, click the "Metal Consumption" tile, then select the "Compute groups" tab.
+- Create a Compute Group
+  - Click the "Create compute group" button and fill in the required details.
+- Create a Compute Instance
+  - After creating the compute group, click the "Create compute instance" button and enter the necessary details to create the new compute instance.
 
-Step 6. Create a new Bare Metal host using this OS image service.
 
-To create a new Bare Metal host, sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".
-Select the Dashboard tile "Metal Consumption" and click on the tab "Compute groups". Further, create a host using the following steps:
-a. First, create a Compute Group by clicking the "Create compute group" button and fill in the details.
-b. Create a Compute Instance by clicking the "Create compute instance" button and fill in the details.
-
-
-# Building RHEL image
+# Detailed Version of Build Process
 
 These are the high-level steps required to generate the Bare Metal RHEL service:
 * Set up a Linux system with 20-40GB of free file system space for the build
@@ -208,6 +240,7 @@ Next, you will need to manually download the appropriate RHEL .ISO onto the Linu
 This RHEL recipe has been successfully tested with the following list of RHEL distributions and its derivatives:
 * RHEL 8.6
 * RHEL 8.7
+* RHEL 8.10
 * RHEL 9.0
 * RHEL 9.1
 * RHEL 9.2
@@ -413,17 +446,16 @@ Here is a description of the files in this repo:
 
 Filename                       | Description
 ------------------------------ | -----------
-README.md                      | This documentation
-glm-build-image-and-service.sh | This is the top-level build script that will take an RHEL install ISO and generate an RHEL service .yml file that can be imported as a Host OS into a Bare Metal portal.
-glm-image-build.sh             | This script will repack the RHEL .ISO file for a Bare Metal RHEL install service that uses Virtual Media to get the installation started.
-glm-service-build.sh           | This script generates a Bare Metal OS service .yml file appropriate for uploading the service to a Bare Metal portal(s).
-glm-test-service-image.sh      | This script will verify that the OS image referred to in a corresponding Bare Metal OS service .yml is correct.
-glm-kickstart.cfg.template     | The core RHEL kickstart file (templated with install-env-v1)
-glm-service.yml.template       | This is the Bare Metal .YML service file template.
-Hosting.md                     | This file is for additional requirements on the web server.
+README.md                      | This documentation file.
+glm-build-image-and-service.sh | The top-level build script that takes an RHEL installation ISO and generates an RHEL service .yml file, which can then be imported as a Host OS into a Bare Metal portal.
+glm-image-build.sh             | This script repacks the RHEL .ISO file to create a Bare Metal RHEL installation service that uses Virtual Media to initiate the installation process.
+glm-service-build.sh           | This script generates a Bare Metal OS service .yml file, suitable for uploading the service to one or more Bare Metal portals.
+glm-test-service-image.sh      | This script verifies the correctness of the OS image referenced in the corresponding Bare Metal OS service .yml file.
+glm-kickstart.cfg.template     | The core RHEL kickstart file, templated with install-env-v1.
+glm-service.yml.template       | The template for the Bare Metal .yml service file.
+Hosting.md                     | This file contains additional requirements for the web server.
 
-Feel free to modify these files to suit your specific needs.
-General changes that you want to contribute back via a pull request are much appreciated.
+Please feel free to modify these files to meet your specific needs. Any general changes you'd like to contribute via a pull request are greatly appreciated.
 
 ## Modifying the RHEL kickstart file
 
@@ -452,7 +484,7 @@ For example:
 | |     such that the file can be downloaded from the following URL:
 | |     https://10.152.3.96/images/RHEL-9.0-BareMetal.iso
 | | (2) Add the Bare Metal Service file (RHEL-9.0-BareMetal.yml) to the HPE Bare Metal Portal
-| |     (https://client.greenlake.hpe-gl-intg.com/). To add the HPE Bare Metal Service file,
+| |     (https://client.greenlake.hpe.com/). To add the HPE Bare Metal Service file,
 | |     sign in to the HPE Bare Metal Portal and select the Tenant by clicking "Go to tenant".
 | |     Select the Dashboard tile "Metal Consumption" and click on the Tab "OS/application images".
 | |     Click on the button "Add OS/application image" to Upload the OS/application YML file.
@@ -477,9 +509,8 @@ Here are some points to note:
 
 ## Known Observations and Limitations
 
-<1> Host readiness for the user to log in  
-After the host is created successfully, the Portal UI shows progress 100%.  
-However, the host os is still booting up in the background, resulting in user login (serial console login and SSH login) being delayed by 2 to 3 minutes.
+<1> Host Readiness for User Login  
+Once the host is successfully created, the Portal UI will display the state "Ready". However, the host operating system is still booting up in the background, which causes a delay of 5 to 10 minutes before the user can log in, either via the serial console or SSH.
 
 ## Troubleshooting
 
