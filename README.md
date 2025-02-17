@@ -45,6 +45,14 @@ Linux            | RHEL              | 8.6, 8.7, 8.10, 9.0, 9.1, 9.2, 9.4, 9.5
 Linux            | Oracle Linux (OL) | 8.6, 8.9, 9.3, 9.4
 Linux            | Rocky Linux       | 8.8, 9.0
 
+## Supported Network Bonding Configuration for HPE PCE Bare Metal
+This section provides the BMaaS OS configurations for RHEL and its derivatives (Oracle Linux and Rocky Linux), outlining Switch LAG settings along with bonding modes and key configuration parameters.
+
+Switch LAG   | Configuration Details |
+------------ | --------------------- |
+**Disabled** | <1> Configure the following in the OS Image Service Template file [glm-service.yml.template](glm-service.yml.template):  <BR> `no_switch_lag: true` <BR> <2> Configure the following in [glm-cloud-init.template](glm-cloud-init.template): <BR> `Bond-mode: balance-tlb` <BR> `bond-miimon: 100` <BR> `bond-xmit_hash_policy: 2` |
+**Enabled**  | <1> Configure the following in the cloud-init configuration file [glm-service.yml.template](glm-service.yml.template):  <BR> `no_switch_lag: false` <BR> <2> Configure the following in [glm-cloud-init.template](glm-cloud-init.template): <BR> `Bond-mode: balance-xor`  <BR> `bond-miimon: 100`  <BR> `bond-xmit_hash_policy: 2` |
+
 
 # Quick Guide for Build Process
 
