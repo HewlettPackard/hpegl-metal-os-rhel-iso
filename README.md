@@ -45,12 +45,21 @@ Linux            | RHEL              | 8.6, 8.7, 8.10, 9.0, 9.1, 9.2, 9.4, 9.5
 Linux            | Oracle Linux (OL) | 8.6, 8.9, 9.3, 9.4
 Linux            | Rocky Linux       | 8.8, 9.0
 
+## Supported Network Bonding Configuration for HPE PCE Bare Metal
+This section provides the BMaaS OS configurations for RHEL and its derivatives (Oracle Linux and Rocky Linux), outlining Switch LAG (Link Aggregation Group) settings along with bonding modes and key configuration parameters.<BR><BR>
+**Additional Reference:** For a detailed overview of bonding modes and the required switch settings, please refer to the official [RHEL9 Networking Guide](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_networking/configuring-network-bonding_configuring-and-managing-networking#configuring-network-bonding_configuring-and-managing-networking).
+
+Switch LAG   | Configuration Details |
+------------ | --------------------- |
+**Disabled** <BR> (Default Configuration) | **Configuration Details:** This is the **$${\color{red}default}$$** bonding  mode for the host. <BR><BR> **Behavior:** When the switch LAG is disabled, the bond mode is set to TLB (Transmit Load Balancing). In this mode, only one network port will receive incoming traffic, while all network ports in the bond will participate in transmitting outgoing traffic. |
+**Enabled** <BR> (User Configurable)  | **Configuration Details:** When the switch LAG is enabled, the bonding mode **needs to be set manually to Balance XOR**. <BR><BR> **Behavior:** When the switch LAG is enabled and the bond mode is set to XOR, the switch is configured to allow receiving traffic on both network ports. <BR><BR> **Configuration Steps:** <BR> <1> Set `no_switch_lag` to `false` in the **OS Image Service file** ([glm-service.yml.template](glm-service.yml.template)) <BR> <2> In the cloud-init configuration file ([glm-cloud-init.template](glm-cloud-init.template)), update the bonding mode by setting: <BR> `bond-mode: balance-xor`. |
+
 
 # Quick Guide for Build Process
 
 Workflow for Building Image:
 
-![image](https://github.com/user-attachments/assets/e6c66b43-2776-4b22-9795-0fe2e4ed5dfc)
+![image](https://github.com/user-attachments/assets/ced85a55-118b-42b2-8d24-2a6e0de3ed3f)
 
 
 **Prerequisites:**
