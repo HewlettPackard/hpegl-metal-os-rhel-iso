@@ -207,7 +207,7 @@ network:
       {{- $vlan_parent = .Name}}
   {{- end}}
 
-  {{- if and (gt .UntaggedNet.VID 0) (eq .UntaggedNet.NoIPAddr false) }}
+  {{- if gt .UntaggedNet.VID 0 }}
       {{- $net_zero := .UntaggedNet }}
       {{- $range_zero := index $net_zero.Ranges 0 }}
       subnets:
@@ -234,7 +234,6 @@ network:
       name: {{$vlan_parent}}.{{.VID}}
       vlan_link:  {{$vlan_parent}}
       vlan_id: {{.VID}}
-      {{- if eq .NoIPAddr false }}
       {{- $range_zero := index .Ranges 0}}
       subnets:
       - type: static
@@ -252,7 +251,6 @@ network:
           - {{.}}
           {{- end}}
         {{- end}}
-      {{- end}}
       {{- end}}
   {{- end}}
   {{- end}}  {{/* range .Connections  */}}
