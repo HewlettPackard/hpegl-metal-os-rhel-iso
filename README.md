@@ -65,7 +65,7 @@ Workflow for Building Image:
 **Prerequisites:**
 ```
 This setup ensures a reliable and secure process for managing and deploying OS images in your HPE Bare Metal environment.
-1. You will need a web server with HTTPS support to store the HPE Bare Metal images.
+1. You will need a web server with HTTPS support to store the HPE Base Metal images.
 2. The Web Server is anything that:
     A. you can upload large OS image (.iso) to, and
     B. is on a network that will be reachable from the HPE On-Premises Controller.
